@@ -54,7 +54,7 @@ export default {
         },
         columns: [
           'expandCol', 'input', 'risk_level', 'user',
-          'asset', 'account', 'session', 'timestamp'
+          'asset', 'account', 'session', 'timestamp', 'hmac_verify', 'encrypt_value'
         ],
         extraQuery: {
           date_to: dateTo,
