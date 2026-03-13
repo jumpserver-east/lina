@@ -5,15 +5,15 @@ utils_dir=$(pwd)
 project_dir=$(dirname "$utils_dir")
 release_dir=${project_dir}/release
 
-if [[ $(uname) == 'Darwin' ]]; then
-  alias sedi="sed -i ''"
-else
-  alias sedi='sed -i'
-fi
+# if [[ $(uname) == 'Darwin' ]]; then
+#   alias sedi="sed -i ''"
+# else
+#   alias sedi='sed -i'
+# fi
 
-function change_version() {
-  sedi "s@version-dev@${VERSION}@g" "${project_dir}/src/layout/components/NavHeader/About.vue" || return 2
-}
+# function change_version() {
+#   sedi "s@version-dev@${VERSION}@g" "${project_dir}/src/layout/components/NavHeader/About.vue" || return 2
+# }
 
 function install_deps() {
   # 下载依赖模块并构建

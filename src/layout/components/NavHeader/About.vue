@@ -77,11 +77,15 @@ export default {
       return [
         {
           label: this.$t('Product'),
-          value: 'JumpServer ' + this.versionType
+          value: 'JumpServer 运维安全审计堡垒机（密码模块）'
+        },
+        {
+          label: '型号',
+          value: 'JS-GM'
         },
         {
           label: this.$t('Version'),
-          value: 'version-dev'
+          value: 'V1.0'
         },
         {
           label: this.$t('PermissionCompany'),
