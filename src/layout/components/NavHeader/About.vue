@@ -77,7 +77,7 @@ export default {
       return [
         {
           label: this.$t('Product'),
-          value: 'JumpServer 运维安全审计堡垒机（密码模块）'
+          value: '运维安全审计堡垒机（密码模块）'
         },
         {
           label: '型号',
