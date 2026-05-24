@@ -1,10 +1,18 @@
 'use strict'
 const path = require('path')
+const fs = require('fs')
 const CompressionWebpackPlugin = require('compression-webpack-plugin')
 const productionGzipExtensions = /\.(js|css|json|txt|ico|svg)(\?.*)?$/i
 
 function resolve(dir) {
   return path.join(__dirname, dir)
+}
+
+function useExistingStatic(app, urlPath, directories) {
+  const serveStatic = require('serve-static')
+  directories
+    .filter(directory => fs.existsSync(directory))
+    .forEach(directory => app.use(urlPath, serveStatic(directory)))
 }
 
 const name = '' // page title
@@ -42,6 +50,13 @@ module.exports = {
     overlay: {
       warnings: false,
       errors: true
+    },
+    before(app) {
+      const jumpserverDir = path.resolve(__dirname, '../jumpserver_fjdl')
+      useExistingStatic(app, '/static', [
+        path.join(jumpserverDir, 'data/static'),
+        path.join(jumpserverDir, 'apps/static')
+      ])
     },
     proxy: {
       // change xxx-api/login => mock/login
