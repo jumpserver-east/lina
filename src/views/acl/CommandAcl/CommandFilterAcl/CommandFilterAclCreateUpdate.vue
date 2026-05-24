@@ -47,7 +47,15 @@ export default {
             showVirtualAccount: false
           }
         },
-        action: {},
+        action: {
+          options: [
+            { label: this.$t('acl.reject'), value: 'reject' },
+            { label: this.$t('acl.accept'), value: 'accept' },
+            { label: this.$t('acl.review'), value: 'review' },
+            { label: this.$t('acl.faceReview'), value: 'face_review' },
+            { label: this.$t('acl.warning'), value: 'warning' }
+          ]
+        },
         command_groups: {
           el: {
             value: [],
@@ -60,7 +68,7 @@ export default {
           }
         },
         reviewers: {
-          hidden: (item) => !['review', 'warning'].includes(item.action),
+          hidden: (item) => !['review', 'face_review', 'warning'].includes(item.action),
           rules: [rules.RequiredChange],
           el: {
             value: [],
@@ -75,6 +83,12 @@ export default {
         is_active: {
           type: 'checkbox'
         }
+      },
+      cleanFormValue(value) {
+        if (!['review', 'face_review', 'warning'].includes(value.action)) {
+          value.reviewers = []
+        }
+        return value
       }
     }
   }

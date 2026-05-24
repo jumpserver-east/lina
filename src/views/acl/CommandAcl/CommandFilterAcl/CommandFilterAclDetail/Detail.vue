@@ -31,9 +31,9 @@ export default {
         },
         {
           key: this.$t('acl.action'),
-          value: this.object.action?.label
+          value: this.getActionLabel()
         },
-        (this.object.action?.value === 'review' && {
+        (['review', 'face_review'].includes(this.object.action?.value) && {
           key: this.$t('acl.reviewer'),
           value: this.object?.reviewers.map((item) => item?.name).join(', ')
         }),
@@ -41,7 +41,13 @@ export default {
       ]
     }
   },
-  computed: {
+  methods: {
+    getActionLabel() {
+      if (this.object.action?.value === 'face_review') {
+        return this.$t('acl.faceReview')
+      }
+      return this.object.action?.label
+    }
   }
 }
 </script>
