@@ -1,6 +1,6 @@
 <template>
   <div class="login-container">
-    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" auto-complete="on" label-position="left">
+    <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" autocomplete="off" label-position="left">
 
       <div class="title-container">
         <h3 class="title">Login Form</h3>
@@ -26,14 +26,14 @@
           <svg-icon icon-class="password" />
         </span>
         <el-input
-          :key="passwordType"
           ref="password"
           v-model="loginForm.password"
-          :type="passwordType"
-          placeholder="Password"
-          name="password"
+          :type="disableBrowserPasswordManager ? 'text' : passwordType"
+          :class="{ 'password-masked': disableBrowserPasswordManager && passwordType === 'password' }"
+          :placeholder="disableBrowserPasswordManager ? 'Password' : 'Password'"
+          :name="disableBrowserPasswordManager ? undefined : 'password'"
+          :autocomplete="disableBrowserPasswordManager ? 'one-time-code' : 'current-password'"
           tabindex="2"
-          auto-complete="on"
           @keyup.enter.native="handleLogin"
         />
         <span class="show-pwd" @click="showPwd">
@@ -53,6 +53,7 @@
 </template>
 
 <script>
+import { mapGetters } from 'vuex'
 import { validUsername } from '@/utils/secure'
 
 export default {
@@ -86,6 +87,12 @@ export default {
       redirect: undefined
     }
   },
+  computed: {
+    ...mapGetters(['publicSettings']),
+    disableBrowserPasswordManager() {
+      return this.publicSettings['SECURITY_LUNA_DISABLE_BROWSER_PASSWORD_MANAGER'] !== false
+    }
+  },
   watch: {
     $route: {
       handler: function(route) {
@@ -116,7 +123,6 @@ export default {
             this.loading = false
           })
         } else {
-          // debug('error submit!!')
           return false
         }
       })
@@ -229,6 +235,10 @@ $login-light-gray: #eee;
     color: $login-dark-gray;
     cursor: pointer;
     user-select: none;
+  }
+
+  .password-masked ::v-deep .el-input__inner {
+    -webkit-text-security: disc;
   }
 }
 </style>
