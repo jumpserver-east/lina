@@ -45,6 +45,7 @@ export const accountOtherActions = (vm) => {
     {
       name: 'View',
       title: vm.$t('View'),
+      has: false,
       can: vm.$hasPerm('accounts.view_accountsecret'),
       type: 'primary',
       order: 1,
@@ -169,6 +170,7 @@ export const accountOtherActions = (vm) => {
     {
       name: 'SecretHistory',
       title: vm.$t('HistoryPassword'),
+      has: false,
       can: () => vm.$hasPerm('accounts.view_accountsecret'),
       type: 'primary',
       callback: ({ row }) => {
