@@ -161,6 +161,7 @@ export default {
         },
         {
           title: this.$t('ViewSecret'),
+          has: false,
           attrs: {
             type: 'primary',
             label: this.$t('View'),
