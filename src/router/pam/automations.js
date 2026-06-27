@@ -177,6 +177,7 @@ export default [
     path: 'account-backup',
     component: empty,
     name: 'AccountBackup',
+    hidden: true,
     redirect: {
       name: 'AccountBackupList'
     },
