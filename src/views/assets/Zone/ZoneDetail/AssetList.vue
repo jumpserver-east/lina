@@ -1,7 +1,7 @@
 <template>
   <div>
     <TwoCol>
-      <BaseList ref="AssetBaseList" v-bind="config" />
+      <BaseList v-bind="config" ref="AssetBaseList" />
     </TwoCol>
     <AddAssetDialog
       v-if="addAssetSetting.addAssetDialogVisible"
@@ -26,8 +26,7 @@ export default {
   props: {
     object: {
       type: Object,
-      default: () => {
-      }
+      default: () => {}
     }
   },
   data() {
@@ -62,11 +61,7 @@ export default {
               type: 'primary',
               can: !this.$store.getters.currentOrgIsRoot,
               callback: () => {
-                this.$route.params.id = this.object.id
                 this.addAssetSetting.addAssetDialogVisible = true
-                setTimeout(() => {
-                  this.$route.params.id = null
-                }, 500)
               }
             }
           ]
@@ -80,7 +75,7 @@ export default {
             can({ selectedRows }) {
               return selectedRows.length > 0
             },
-            callback: function(rows) {
+            callback: function (rows) {
               this.removeAsset(rows)
             }.bind(this)
           }
@@ -90,7 +85,7 @@ export default {
             order: 10,
             name: 'RemoveAsset',
             title: this.$t('Remove'),
-            callback: function(row) {
+            callback: function (row) {
               this.removeAsset(row)
             }.bind(this)
           }
@@ -104,14 +99,13 @@ export default {
   methods: {
     handleAddAssetDialogClose() {
       this.addAssetSetting.addAssetDialogVisible = false
-      this.$route.params.id = null
       this.reloadTable()
     },
     removeAsset(rows) {
       let patch_data
       let msg
-      if (rows.hasOwnProperty('selectedRows')) {
-        patch_data = rows.selectedRows.map(row => {
+      if (Object.prototype.hasOwnProperty.call(rows, 'selectedRows')) {
+        patch_data = rows.selectedRows.map((row) => {
           return {
             id: row.id,
             zone: null
@@ -119,21 +113,24 @@ export default {
         })
         msg = patch_data.length + ' ' + this.$t('Rows')
       } else {
-        patch_data = [{
-          id: rows.row.id,
-          zone: null
-        }]
+        patch_data = [
+          {
+            id: rows.row.id,
+            zone: null
+          }
+        ]
         msg = rows.row.name
       }
       this.$confirm(this.$t('removeWarningMsg') + ' ' + msg + ' ?', {
         type: 'warning'
-      }).then(() => {
-        this.$axios.patch(`/api/v1/assets/assets/`, patch_data).then(() => {
-          this.reloadTable()
-          this.$message.success(this.$t('RemoveSuccessMsg'))
-        })
-      }).catch(() => {
       })
+        .then(() => {
+          this.$axios.patch(`/api/v1/assets/assets/`, patch_data).then(() => {
+            this.reloadTable()
+            this.$message.success(this.$t('RemoveSuccessMsg'))
+          })
+        })
+        .catch(() => {})
     },
     reloadTable() {
       this.$refs.AssetBaseList.$refs.ListTable.reloadTable()

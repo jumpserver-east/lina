@@ -1,19 +1,18 @@
 <template>
   <Drawer
+    v-model:visible="iVisible"
     :destroy-on-close="true"
     :show-buttons="false"
     :title="$tc('CloudAccountUpdate')"
-    :visible.sync="iVisible"
     class="drawer"
-    v-on="$listeners"
   >
     <IBox>
       <AuthPanel
         :object="object"
         :provider="object.provider.value"
-        :visible.sync="iVisible"
+        v-model:visible="iVisible"
         origin="update"
-        @submitSuccess="onSubmitSuccess"
+        @submit-success="onSubmitSuccess"
       />
     </IBox>
   </Drawer>
@@ -23,6 +22,7 @@
 import AuthPanel from '@/views/assets/Cloud/Account/components/AuthPanel.vue'
 import Drawer from '@/components/Drawer/index.vue'
 import IBox from '@/components/Common/IBox/index.vue'
+import { useVModel } from '@/utils/vue/useVModel'
 
 export default {
   name: 'UpdateDialog',
@@ -37,14 +37,11 @@ export default {
       default: false
     }
   },
-  computed: {
-    iVisible: {
-      set(val) {
-        this.$emit('update:visible', val)
-      },
-      get() {
-        return this.visible
-      }
+  emits: ['update:visible', 'submitSuccess'],
+  setup(props, { emit }) {
+    const iVisible = useVModel(props, emit, 'visible')
+    return {
+      iVisible
     }
   },
   methods: {
@@ -57,13 +54,10 @@ export default {
 
 <style lang="scss" scoped>
 .ibox {
-  margin: 15px
+  margin: 15px;
 }
 
-.drawer ::v-deep {
-  .el-drawer__body {
-    background: #f3f3f3;
-  }
+.drawer :deep(.el-drawer__body) {
+  background: #f3f3f3;
 }
-
 </style>

@@ -2,6 +2,7 @@
   <IBox>
     <GenericCreateUpdateForm
       :encrypted-fields="encryptedFields"
+      :need-get-object-detail="false"
       :fields="fields"
       :fields-meta="fieldsMeta"
       :initial="object"
@@ -72,8 +73,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.password-update ::v-deep .el-input {
+.password-update :deep(.password-input) {
   width: 600px;
-  max-width: 600px;
+  max-width: 100%;
 }
 </style>

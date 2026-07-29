@@ -1,25 +1,28 @@
 <template>
   <div v-loading="loading">
     <AutoDataForm
+      v-bind="$attrs"
       v-if="!loading"
       ref="form"
+      :fields-meta="fieldsMeta"
       :form="form"
       :has-reset="iHasReset"
       :has-save-continue="iHasSaveContinue"
       :is-submitting="isSubmitting"
       :method="method"
       :url="iUrl"
-      v-bind="$attrs"
-      @afterRemoteMeta="handleAfterRemoteMeta"
+      @after-remote-meta="handleAfterRemoteMeta"
       @submit="handleSubmit"
-      v-on="$listeners"
     />
   </div>
 </template>
 <script>
+import { h } from 'vue'
+import { ElLink } from 'element-plus'
 import AutoDataForm from '@/components/Form/AutoDataForm'
 import { getUpdateObjURL } from '@/utils/common/index'
 import { encryptPassword } from '@/utils/secure'
+import { getRuntimeActionMeta } from '@/libs/context/runtime'
 import deepmerge from 'deepmerge'
 
 export default {
@@ -27,6 +30,14 @@ export default {
   components: {
     AutoDataForm
   },
+  emits: [
+    'afterRemoteMeta',
+    'getObjectDone',
+    'performError',
+    'performFinished',
+    'submitSuccess',
+    'update:object'
+  ],
   props: {
     // 创建对象的地址
     url: {
@@ -52,6 +63,14 @@ export default {
       type: Function,
       default: (value) => value
     },
+    fieldsMeta: {
+      type: Object,
+      default: () => ({})
+    },
+    omitUnchangedManyToMany: {
+      type: Boolean,
+      default: true
+    },
     // 获取 meta
     afterGetRemoteMeta: {
       type: Function,
@@ -76,45 +95,47 @@ export default {
     // 创建成功的msg
     createSuccessMsg: {
       type: String,
-      default: function() {
-        return this.$t('CreateSuccessMsg')
+      default: function () {
+        return 'CreateSuccessMsg'
       }
     },
     // 保存成功，继续添加的msg
     saveSuccessContinueMsg: {
       type: String,
-      default: function() {
-        return this.$t('SaveSuccessContinueMsg')
+      default: function () {
+        return 'SaveSuccessContinueMsg'
       }
     },
     // 更新成功的msg
     updateSuccessMsg: {
       type: String,
-      default: function() {
-        return this.$t('UpdateSuccessMsg')
+      default: function () {
+        return 'UpdateSuccessMsg'
       }
     },
     // 创建成功的跳转路由
     createSuccessNextRoute: {
       type: Object,
-      default: function() {
-        const routeName = this.$route.name?.replace('Create', 'List')
+      default: function () {
+        // const routeName = this.$route.name?.replace('Create', 'List')
+        const routeName = 'GroupCreate'
         return { name: routeName }
       }
     },
     // 更新成功的跳转路由
     updateSuccessNextRoute: {
       type: Object,
-      default: function() {
-        const routeName = this.$route.name?.replace('Update', 'List')
+      default: function () {
+        // const routeName = this.$route.name?.replace('Update', 'List')
+        const routeName = 'GroupUpdate'
         return { name: routeName }
       }
     },
     objectDetailRoute: {
       type: Object,
-      default: function() {
-        const routeName = this.$route.name?.replace('Update', 'Detail')
-          .replace('Create', 'Detail')
+      default: function () {
+        // const routeName = this.$route.name?.replace('Update', 'Detail').replace('Create', 'Detail')
+        const routeName = 'GroupDetail'
         return { name: routeName }
       }
     },
@@ -122,13 +143,14 @@ export default {
     getNextRoute: {
       type: Function,
       default(res, method) {
-        return method === 'post' ? this.createSuccessNextRoute : this.updateSuccessNextRoute
+        return { name: 'GroupList' }
+        // return method === 'post' ? this.createSuccessNextRoute : this.updateSuccessNextRoute
       }
     },
     cloneNameSuffix: {
       type: [String, Number],
-      default: function() {
-        return this.$t('Duplicate').toLowerCase()
+      default: function () {
+        return 'Duplicate'.toLowerCase()
       }
     },
     // 获取提交的方法
@@ -139,7 +161,7 @@ export default {
     // 获取创建和更新的url function
     getUrl: {
       type: Function,
-      default: function() {
+      default: function () {
         const objectId = this.getUpdateId()
         let url = this.url
         if (objectId) {
@@ -169,23 +191,27 @@ export default {
         if (addContinue) {
           msg = this.saveSuccessContinueMsg
         }
+        // 这些默认值是原始英文 key（如 CreateSuccessMsg），在此翻译；缺 key 时原样返回，
+        // 调用方传入已翻译的文案也不受影响。
+        msg = this.$t(msg)
         let msgLinkName = ''
         if (res.name) {
           msgLinkName = res.name
         }
-        const h = this.$createElement
         const detailRoute = this.objectDetailRoute
         detailRoute.params = { id: res.id }
         if (this.hasDetailInMsg) {
           msg = msg[0].toLowerCase() + msg.slice(1)
           this.$message({
             message: h('p', null, [
-              h('el-link', {
-                on: {
-                  click: () => this.$router.push(detailRoute)
+              h(
+                ElLink,
+                {
+                  onClick: () => this.$router.push(detailRoute),
+                  style: { 'vertical-align': 'top', 'margin-right': '5px' }
                 },
-                style: { 'vertical-align': 'top', 'margin-right': '5px' }
-              }, msgLinkName),
+                () => msgLinkName
+              ),
               h('span', {}, msg)
             ]),
             type: 'success'
@@ -200,9 +226,12 @@ export default {
       default(res, method, vm, addContinue) {
         const route = this.getNextRoute(res, method)
         if (!(route.params && route.params.id)) {
-          route['params'] = deepmerge(route['params'] || {}, { 'id': res.id })
+          route['params'] = deepmerge(route['params'] || {}, { id: res.id })
         }
-        route['query'] = deepmerge(route['query'], { 'order': this.extraQueryOrder, 'updated': new Date().getTime() })
+        route['query'] = deepmerge(route['query'], {
+          order: this.extraQueryOrder,
+          updated: new Date().getTime()
+        })
 
         this.$emit('submitSuccess', res)
 
@@ -259,7 +288,8 @@ export default {
       action: '',
       actionId: '',
       row: {},
-      method: 'post'
+      method: 'post',
+      initialFormValue: {}
     }
   },
   computed: {
@@ -292,18 +322,22 @@ export default {
       this.$log.debug('Final object is: ', values)
       const formValue = Object.assign(this.form, values)
       this.form = this.afterGetFormValue(formValue)
+      this.initialFormValue = _.cloneDeep(this.form)
     } finally {
       this.loading = false
     }
   },
   methods: {
+    async getDrawerMeta() {
+      return getRuntimeActionMeta(this)
+    },
     async setDrawerMeta() {
-      const drawActionMeta = await this.$store.dispatch('common/getDrawerActionMeta')
+      const drawActionMeta = await this.getDrawerMeta()
       if (drawActionMeta && drawActionMeta.action) {
         this.drawer = true
         this.action = drawActionMeta.action
         this.row = drawActionMeta.row
-        this.actionId = this.row?.id
+        this.actionId = drawActionMeta.id || this.row?.id
       }
     },
     setMethod() {
@@ -314,7 +348,7 @@ export default {
       }
       // this.$log.debug('Drawer: ', this.drawer, this.submitMethod, this.action)
       if (!this.drawer && !this.method) {
-        this.method = this.$route.params['id'] ? 'put' : 'post'
+        this.method = this.$context.get('id') ? 'put' : 'post'
       }
       if (this.drawer && !this.submitMethod) {
         if (this.action === 'clone' || this.action === 'create') {
@@ -327,16 +361,14 @@ export default {
     getUpdateId() {
       if (this.actionId && this.action === 'update') {
         return this.actionId
-      } else {
-        return this.$route.params['id']
       }
+      return this.$context.get('id')
     },
     getCloneId() {
       if (this.actionId && this.action === 'clone') {
         return this.actionId
-      } else {
-        return this.$route.query['clone_from']
       }
+      return this.$context.get('clone_from')
     },
     isUpdateMethod() {
       return ['put', 'patch'].indexOf(this.method.toLowerCase()) > -1
@@ -358,16 +390,78 @@ export default {
       return values
     },
     handleAfterRemoteMeta(meta) {
+      let result
       if (this.afterGetRemoteMeta) {
-        return this.afterGetRemoteMeta(meta)
+        result = this.afterGetRemoteMeta(meta)
       }
+      this.$emit('afterRemoteMeta', meta)
+      return result
     },
     handleSubmit(values, formName, addContinue) {
       let handler = this.onSubmit || this.defaultOnSubmit
       handler = handler.bind(this)
       values = this.cleanFormValue(values)
+      const initialValues = formName?.getInitialFormValue?.() || this.initialFormValue
+      values = this.removeUnchangedManyToManyFields(values, initialValues, formName)
       values = this.encryptFields(values)
       return handler(values, formName, addContinue)
+    },
+    normalizeManyToManyValue(value, valueKey = 'id') {
+      const values = Array.isArray(value) ? value : value == null || value === '' ? [] : [value]
+      const normalized = values
+        .map((item) => {
+          if (!item || typeof item !== 'object') {
+            return item
+          }
+          return item[valueKey] ?? item.value ?? item.id
+        })
+        .filter((item) => item !== undefined && item !== null && item !== '')
+        .map((item) => String(item))
+      return [...new Set(normalized)].sort()
+    },
+    getManyToManyFields(formInstance) {
+      const fields = new Map(Object.entries(this.fieldsMeta))
+      const collectFields = (items = []) => {
+        items.forEach((item) => {
+          if (!item || typeof item !== 'object') {
+            return
+          }
+          const componentName = item.component?.name || item.component?.__name
+          if (
+            ['resourceSelect', 'treeResourceSelect'].includes(item.type) ||
+            ['ResourceSelect', 'TreeResourceSelect'].includes(componentName)
+          ) {
+            fields.set(item.id || item.prop, item)
+          }
+          collectFields(item.fields || item.children || [])
+        })
+      }
+      collectFields(formInstance?.innerContent)
+      return fields
+    },
+    removeUnchangedManyToManyFields(values, initialValues = this.initialFormValue, formInstance) {
+      if (!this.omitUnchangedManyToMany || !this.isUpdateMethod() || !values) {
+        return values
+      }
+
+      const payload = { ...values }
+      this.getManyToManyFields(formInstance).forEach((fieldMeta, fieldName) => {
+        const componentName = fieldMeta?.component?.name || fieldMeta?.component?.__name
+        const isRelationSelect =
+          ['resourceSelect', 'treeResourceSelect'].includes(fieldMeta?.type) ||
+          ['ResourceSelect', 'TreeResourceSelect'].includes(componentName)
+        if (!isRelationSelect || !Object.prototype.hasOwnProperty.call(payload, fieldName)) {
+          return
+        }
+
+        const valueKey = fieldMeta?.el?.valueKey || 'id'
+        const initialValue = this.normalizeManyToManyValue(initialValues?.[fieldName], valueKey)
+        const currentValue = this.normalizeManyToManyValue(payload[fieldName], valueKey)
+        if (JSON.stringify(initialValue) === JSON.stringify(currentValue)) {
+          delete payload[fieldName]
+        }
+      })
+      return payload
     },
     defaultOnSubmit(validValues, formName, addContinue) {
       this.isSubmitting = true
@@ -383,7 +477,7 @@ export default {
     },
     async getCloneForm(cloneFrom) {
       const [curUrl, query] = this.url.split('?')
-      const url = `${curUrl}${cloneFrom}/${query ? ('?' + query) : ''}`
+      const url = `${curUrl}${cloneFrom}/${query ? '?' + query : ''}`
       try {
         const object = await this.getObjectDetail(url)
         let name = ''
@@ -438,5 +532,4 @@ export default {
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

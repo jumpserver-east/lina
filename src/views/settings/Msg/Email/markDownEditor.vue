@@ -1,23 +1,35 @@
 <template>
-  <div>
-    <vue-markdown-editor
+  <div class="markdown-editor">
+    <VueMarkdownEditor
       v-model="localValue"
-      :right-toolbar="rightToolbar"
       :left-toolbar="leftToolbar"
+      :right-toolbar="rightToolbar"
       height="400px"
     />
   </div>
 </template>
+
 <script>
-import VueMarkdownEditor, { xss } from '@kangc/v-md-editor'
+import VueMarkdownEditor from '@kangc/v-md-editor'
 import '@kangc/v-md-editor/lib/style/base-editor.css'
 import vuepressTheme from '@kangc/v-md-editor/lib/theme/vuepress.js'
 import '@kangc/v-md-editor/lib/theme/style/vuepress.css'
+import DOMPurify from 'dompurify'
+import MarkdownIt from 'markdown-it'
 import Prism from 'prismjs'
 
-VueMarkdownEditor.use(vuepressTheme, {
-  Prism
+VueMarkdownEditor.use(vuepressTheme, { Prism })
+
+const markdown = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true
 })
+
+function renderHtml(source) {
+  return DOMPurify.sanitize(markdown.render(source || ''))
+}
 
 export default {
   name: 'RichEditor',
@@ -31,13 +43,13 @@ export default {
   data() {
     return {
       localValue: this.value,
-      rightToolbar: 'preview  sync-scroll fullscreen',
-      leftToolbar: 'undo redo clear | h bold italic strikethrough quote | ul ol hr | link  code '
+      leftToolbar: 'undo redo clear | h bold italic strikethrough quote | ul ol hr | link code',
+      rightToolbar: 'preview sync-scroll fullscreen'
     }
   },
   computed: {
     html() {
-      return xss.process(VueMarkdownEditor.themeConfig.markdownParser.render(this.localValue))
+      return renderHtml(this.localValue)
     }
   },
   watch: {
@@ -50,14 +62,19 @@ export default {
       this.$emit('input', val)
       this.$emit('htmlChange', this.html)
     }
+  },
+  mounted() {
+    this.$emit('htmlChange', this.html)
   }
 }
 </script>
 
-<style scoped lang="scss">
-.v-md-editor {
-  box-shadow: unset;
-  border: 1px solid #ddd;
-  border-radius: 2px;
+<style lang="scss" scoped>
+.markdown-editor {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  padding: 10px;
 }
 </style>

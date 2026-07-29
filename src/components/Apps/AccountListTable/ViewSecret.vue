@@ -1,14 +1,13 @@
 <template>
   <div>
     <Dialog
+      v-bind="$attrs"
+      v-model:visible="showSecret"
       :destroy-on-close="true"
       :show-cancel="false"
-      :title="title"
-      :visible.sync="showSecret"
-      :width="'50'"
-      v-bind="$attrs"
+      :title="iTitle"
+      width="720px"
       @confirm="accountConfirmHandle"
-      v-on="$listeners"
     >
       <el-form :model="secretInfo" class="password-form" label-position="right" label-width="130px">
         <el-form-item :label="$tc('Name')">
@@ -20,28 +19,35 @@
         <el-form-item :label="secretTypeLabel">
           <SecretViewerFormatter
             :cell-value="secretInfo.secret"
-            :col="{ formatterArgs: {
-              name: account['name'],
-              secretType: secretType || ''
-            }}"
+            :col="{
+              formatterArgs: {
+                name: account['name'],
+                secretType: secretType || ''
+              }
+            }"
             @input="onShowKeyCopyFormatterChange"
           />
         </el-form-item>
-        <el-form-item v-if="secretType === 'ssh_key'" :label="$tc('SshKeyFingerprint')">
+        <el-form-item v-if="secretType === 'ssh_key'" :label="`${$tc('SshKeyFingerprint')} (MD5)`">
           <span>{{ sshKeyFingerprint }}</span>
         </el-form-item>
+        <el-form-item
+          v-if="secretType === 'ssh_key'"
+          :label="`${$tc('SshKeyFingerprint')} (SHA256)`"
+        >
+          <span>{{ sshKeyFingerprintSha256 }}</span>
+        </el-form-item>
         <el-form-item :label="$tc('DateCreated')">
-          <span>{{ account['date_created'] | date }}</span>
+          <span>{{ toSafeLocalDateStr(account['date_created']) }}</span>
         </el-form-item>
         <el-form-item :label="$tc('DateUpdated')">
-          <span>{{ account['date_updated'] | date }}</span>
+          <span>{{ toSafeLocalDateStr(account['date_updated']) }}</span>
         </el-form-item>
-        <el-form-item v-if="showPasswordRecord" v-perms="'accounts.view_accountsecret'" :label="$tc('PasswordRecord')">
-          <el-link
-            :underline="false"
-            type="success"
-            @click="showHistoryDialog"
-          >
+        <el-form-item
+          v-if="showPasswordRecord && $hasPerm('accounts.view_accountsecret')"
+          :label="$tc('PasswordRecord')"
+        >
+          <el-link underline="never" type="success" @click="showHistoryDialog">
             <span style="padding-right: 30px">
               {{ versions }}
             </span>
@@ -51,17 +57,18 @@
     </Dialog>
     <PasswordHistoryDialog
       v-if="showPasswordHistoryDialog"
+      v-model:visible="showPasswordHistoryDialog"
       :account="account"
-      :visible.sync="showPasswordHistoryDialog"
     />
   </div>
 </template>
 
 <script>
 import Dialog from '@/components/Dialog/index.vue'
-import PasswordHistoryDialog from './PasswordHistoryDialog.vue'
 import { SecretViewerFormatter } from '@/components/Table/TableFormatters'
+import { useDateTime } from '@/composables/useDateTime'
 import { encryptPassword } from '@/utils/secure'
+import PasswordHistoryDialog from './PasswordHistoryDialog.vue'
 import { mapGetters } from 'vuex'
 
 export default {
@@ -90,15 +97,14 @@ export default {
     },
     title: {
       type: String,
-      default: function() {
-        return this.$tc('Detail')
-      }
+      default: ''
     },
     showPasswordRecord: {
       type: Boolean,
       default: true
     }
   },
+  emits: ['update:visible'],
   data() {
     return {
       modifiedSecret: '',
@@ -107,7 +113,9 @@ export default {
       showSecret: false,
       mfaDialogVisible: true,
       sshKeyFingerprint: '-',
+      sshKeyFingerprintSha256: '-',
       historyCount: 0,
+      iTitle: this.title || this.$tc('Detail'),
       showPasswordHistoryDialog: false
     }
   },
@@ -122,10 +130,13 @@ export default {
       return this.account['secret_type'].value
     }
   },
+  setup() {
+    return useDateTime()
+  },
   mounted() {
     if (this.showPasswordRecord) {
       const url = `/api/v1/accounts/account-secrets/${this.account.id}/histories/?limit=1`
-      this.$axios.get(url, { disableFlashErrorMsg: true }).then(resp => {
+      this.$axios.get(url, { disableFlashErrorMsg: true }).then((resp) => {
         this.versions = resp.count
         this.showSecretDialog()
       })
@@ -144,19 +155,21 @@ export default {
         name: this.secretInfo.name,
         secret: encryptPassword(this.modifiedSecret)
       }
-      const url = this.type === 'account' ? `/api/v1/accounts/accounts` : `/api/v1/accounts/account-templates`
+      const url =
+        this.type === 'account' ? `/api/v1/accounts/accounts` : `/api/v1/accounts/account-templates`
       this.$axios.patch(`${url}/${this.account.id}/`, params).then(() => {
         this.$message.success(this.$tc('UpdateSuccessMsg'))
       })
     },
     showSecretDialog() {
-      if (!this.publicSettings.SECURITY_ACCOUNT_SECRET_READ) {
+      if (this.publicSettings.SECURITY_DISABLE_VIEW_SECRET) {
         this.$message.warning(this.$tc('AccountSecretReadDisabled'))
         return
       }
-      return this.$axios.get(this.url).then((res) => {
+      return this.$axios.get(this.url, { disableFlashErrorMsg: true }).then((res) => {
         this.secretInfo = res
         this.sshKeyFingerprint = res?.spec_info?.ssh_key_fingerprint || '-'
+        this.sshKeyFingerprintSha256 = res?.spec_info?.ssh_key_fingerprint_sha256 || '-'
         this.showSecret = true
       })
     },
@@ -175,12 +188,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.item-textarea ::v-deep .el-textarea__inner {
+.item-textarea :deep(.el-textarea__inner) {
   height: 110px;
 }
 
 .el-form-item {
-  border-bottom: 1px solid #EBEEF5;
+  border-bottom: 1px solid #ebeef5;
   padding: 5px 0;
   margin-bottom: 0;
 
@@ -188,7 +201,7 @@ export default {
     border-bottom: none;
   }
 
-  ::v-deep .el-form-item__label {
+  :deep(.el-form-item__label) {
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -199,7 +212,7 @@ export default {
     white-space: normal;
   }
 
-  ::v-deep .el-form-item__content {
+  :deep(.el-form-item__content) {
     line-height: 30px;
 
     pre {

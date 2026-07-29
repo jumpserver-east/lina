@@ -39,19 +39,17 @@ export default {
       updateSuccessNextRoute: { name: 'CloudAccountList', params: { activeMenu: 'StrategyList' } },
       createSuccessNextRoute: { name: 'CloudAccountList', params: { activeMenu: 'StrategyList' } },
       cleanFormValue: (value) => {
-        value['category'] = this.$route.query.category || 'host'
+        value['category'] = this.$context.get('category') ?? 'host'
         return value
       },
       getUrl() {
-        const id = this.$route.params?.id
+        const id = this.$context.get('id')
         return id ? `${this.url}${id}/` : this.url
       }
     }
   },
   methods: {}
 }
-
 </script>
 
-<style lang="scss" scoped>
-</style>
+<style lang="scss" scoped></style>

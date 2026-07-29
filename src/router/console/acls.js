@@ -45,7 +45,8 @@ export default [
             component: () => import('@/views/acls/UserLoginACL/UserLoginACLCreateUpdate.vue'),
             hidden: true,
             meta: {
-              title: i18n.t('UserLoginACLCreate'), activeMenu: ''
+              title: i18n.t('UserLoginACLCreate'),
+              activeMenu: ''
             }
           },
           {
@@ -54,7 +55,8 @@ export default [
             component: () => import('@/views/acls/UserLoginACL/UserDetail/index'),
             hidden: true,
             meta: {
-              title: i18n.t('UserLoginACLDetail'), activeMenu: '',
+              title: i18n.t('UserLoginACLDetail'),
+              activeMenu: '',
               app: 'acls',
               resource: 'loginacl'
             }
@@ -97,14 +99,16 @@ export default [
           {
             path: 'create',
             name: 'CommandFilterACLCreate',
-            component: () => import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclCreateUpdate'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclCreateUpdate'),
             hidden: true,
             meta: { title: i18n.t('CommandFilterACLCreate'), activeMenu: '' }
           },
           {
             path: ':id',
             name: 'CommandFilterACLDetail',
-            component: () => import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclDetail/index'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclDetail/index'),
             hidden: true,
             meta: {
               title: i18n.t('CommandFilterACLDetail'),
@@ -114,7 +118,8 @@ export default [
           {
             path: ':id/update',
             name: 'CommandFilterACLUpdate',
-            component: () => import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclCreateUpdate'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandFilterAcl/CommandFilterAclCreateUpdate'),
             hidden: true,
             meta: { title: i18n.t('CommandFilterACLUpdate'), activeMenu: '' }
           }
@@ -215,6 +220,53 @@ export default [
         ]
       },
       {
+        path: 'clipboard-acls',
+        component: empty,
+        redirect: {
+          name: 'ClipboardACLList'
+        },
+        name: 'ClipboardACLs',
+        meta: {
+          title: i18n.t('ClipboardACLs'),
+          licenseRequired: true,
+          app: 'acls',
+          resource: 'clipboardacl'
+        },
+        children: [
+          {
+            path: '',
+            name: 'ClipboardACLList',
+            component: () => import('@/views/acls/ClipboardACL/ClipboardAclList.vue'),
+            meta: {
+              title: i18n.t('ClipboardACLs'),
+              activeMenu: '',
+              menuTitle: i18n.t('Clipboard')
+            }
+          },
+          {
+            path: 'create',
+            name: 'ClipboardACLCreate',
+            component: () => import('@/views/acls/ClipboardACL/ClipboardAclCreateUpdate.vue'),
+            hidden: true,
+            meta: { title: i18n.t('ClipboardACLCreate'), activeMenu: '' }
+          },
+          {
+            path: ':id',
+            name: 'ClipboardACLDetail',
+            component: () => import('@/views/acls/ClipboardACL/ClipboardAclDetail/index'),
+            hidden: true,
+            meta: { title: i18n.t('ClipboardACLDetail'), activeMenu: '' }
+          },
+          {
+            path: ':id/update',
+            name: 'ClipboardACLUpdate',
+            component: () => import('@/views/acls/ClipboardACL/ClipboardAclCreateUpdate.vue'),
+            hidden: true,
+            meta: { title: i18n.t('ClipboardACLUpdate'), activeMenu: '' }
+          }
+        ]
+      },
+      {
         path: 'cmd-groups',
         component: empty,
         redirect: {
@@ -242,7 +294,8 @@ export default [
           {
             path: 'create',
             name: 'CommandGroupCreate',
-            component: () => import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupCreateUpdate'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupCreateUpdate'),
             hidden: true,
             meta: {
               title: i18n.t('CommandGroupCreate'),
@@ -252,7 +305,8 @@ export default [
           {
             path: ':id',
             name: 'CommandGroupDetail',
-            component: () => import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupDetail/index'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupDetail/index'),
             hidden: true,
             meta: {
               title: i18n.t('CommandGroupDetail'),
@@ -262,7 +316,8 @@ export default [
           {
             path: ':id/update',
             name: 'CommandGroupUpdate',
-            component: () => import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupCreateUpdate'),
+            component: () =>
+              import('@/views/acls/CommandFilterACL/CommandGroup/CommandGroupCreateUpdate'),
             hidden: true,
             meta: {
               title: i18n.t('CommandGroupUpdate'),
@@ -299,7 +354,8 @@ export default [
           {
             path: 'create',
             name: 'ConnectMethodACLCreate',
-            component: () => import('@/views/acls/ConnectMethodACL/ConnectMethodAclCreateUpdate.vue'),
+            component: () =>
+              import('@/views/acls/ConnectMethodACL/ConnectMethodAclCreateUpdate.vue'),
             hidden: true,
             meta: { title: i18n.t('ConnectMethodAclCreate'), activeMenu: '' }
           },
@@ -313,7 +369,8 @@ export default [
           {
             path: ':id/update',
             name: 'ConnectMethodACLUpdate',
-            component: () => import('@/views/acls/ConnectMethodACL/ConnectMethodAclCreateUpdate.vue'),
+            component: () =>
+              import('@/views/acls/ConnectMethodACL/ConnectMethodAclCreateUpdate.vue'),
             hidden: true,
             meta: { title: i18n.t('ConnectMethodAclUpdate'), activeMenu: '' }
           }

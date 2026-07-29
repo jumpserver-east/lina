@@ -27,14 +27,11 @@ export default {
         columnsExclude: ['rules'],
         columnsShow: {
           min: ['type', 'actions'],
-          default: [
-            'type', 'created_by', 'org_name',
-            'date_created', 'date_updated', 'actions'
-          ]
+          default: ['type', 'created_by', 'org_name', 'date_created', 'date_updated', 'actions']
         },
         columnsMeta: {
           org_name: {
-            formatter: function(row, col, cell) {
+            formatter: function (row, col, cell) {
               const currentOrg = vm.$store.getters.currentOrg
               return currentOrg['is_root'] ? row.org_name : currentOrg.name
             }
@@ -44,19 +41,16 @@ export default {
             formatterArgs: {
               drawer: true,
               permissions: 'tickets.view_ticketflow',
-              getRoute: ({ row }) => {
-                this.$route.params.id = row.id
-                return {
-                  name: 'FlowDetail',
-                  params: {
-                    id: row.id
-                  }
+              getRoute: ({ row }) => ({
+                name: 'FlowDetail',
+                params: {
+                  id: row.id
                 }
-              },
+              }),
               getDrawerTitle: ({ row }) => {
                 return row.type.label
               },
-              getTitle: function({ row }) {
+              getTitle: function ({ row }) {
                 return row.type.label
               }
             }

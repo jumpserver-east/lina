@@ -1,6 +1,6 @@
 <template>
   <Page>
-    <CardTable ref="CardTable" v-bind="$data" />
+    <CardTable v-bind="$data" ref="CardTable" />
   </Page>
 </template>
 
@@ -46,6 +46,15 @@ export default {
             tags: ['client', 'cli']
           },
           {
+            id: 'clipboard-acl',
+            display_name: this.$t('ClipboardACLs'),
+            name: 'ClipboardACLList',
+            comment: this.$t('ClipboardACLHelpText'),
+            icon: 'copy',
+            edition: 'enterprise',
+            tags: ['clipboard']
+          },
+          {
             id: 'UserLoginACL',
             display_name: this.$t('UserLoginACLs'),
             name: 'UserLoginACLList',
@@ -75,8 +84,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-::v-deep .image img {
+:deep(.image img) {
   width: 40px;
-  height: 40px
+  height: 40px;
 }
 </style>

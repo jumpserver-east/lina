@@ -1,5 +1,5 @@
 <template>
-  <GenericCreateUpdatePage :initial="initial" v-bind="$data" />
+  <GenericCreateUpdatePage v-bind="$data" :initial="initial" />
 </template>
 
 <script>
@@ -34,10 +34,10 @@ export default {
         }
       },
       getUrl() {
-        const params = this.$route.params
         let url = `/api/v1/tickets/flows/`
-        if (params.id) {
-          url = `${url}${params.id}/`
+        const id = this.$context.get('id')
+        if (id) {
+          url = `${url}${id}/`
         }
         return `${url}`
       },
@@ -45,15 +45,14 @@ export default {
         data['rules'] = data['rules'].slice(0, data['approval_level'])
         return data
       },
-      onPerformError() {
-      },
+      onPerformError() {},
       updateSuccessNextRoute: { name: 'TicketFlow' },
       createSuccessNextRoute: { name: 'TicketFlow' }
     }
   },
   computed: {
     initial() {
-      return this.$route.query
+      return this.$context.getScope('overlay')?.query || this.$route.query
     }
   },
   mounted() {
@@ -65,6 +64,4 @@ export default {
 }
 </script>
 
-<style lang="less" scoped>
-
-</style>
+<style lang="scss" scoped></style>

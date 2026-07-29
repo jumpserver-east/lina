@@ -1,7 +1,12 @@
 <template>
-  <AssetTreeTable ref="TreeTablePage" :table-config="tableConfig" :tree-setting="treeSetting">
+  <AssetTreeTable
+    ref="TreeTablePage"
+    :table-config="tableConfig"
+    :tree-setting="treeSetting"
+    @url-change="handleTreeUrlChange"
+  >
     <template #table>
-      <AccountListTable ref="table" v-bind="tableConfig" />
+      <AccountListTable v-bind="tableConfig" ref="table" />
     </template>
   </AssetTreeTable>
 </template>
@@ -10,6 +15,7 @@
 import AssetTreeTable from '@/components/Apps/AssetTreeTable/index.vue'
 import AccountListTable from '@/components/Apps/AccountListTable/AccountList.vue'
 import { DetailFormatter } from '@/components/Table/TableFormatters'
+import { setRouterQuery } from '@/utils/common/index'
 
 export default {
   name: 'AssetAccountList',
@@ -46,6 +52,7 @@ export default {
       treeSetting: {
         showMenu: false,
         showAssets: true,
+        selectSyncToRoute: false,
         url: '/api/v1/accounts/accounts/',
         countResource: 'account',
         edit: {
@@ -55,12 +62,24 @@ export default {
         }
       }
     }
+  },
+  methods: {
+    handleTreeUrlChange(url) {
+      this.tableConfig = {
+        ...this.tableConfig,
+        url
+      }
+      setRouterQuery(this, url, { browserOnly: true })
+      this.$nextTick(() => {
+        this.$refs.table?.refresh?.()
+      })
+    }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.asset-table ::v-deep .row-clicked, .asset-user-table ::v-deep .row-background-color {
+.asset-table :deep(.row-clicked, .asset-user-table .row-background-color) {
   background-color: #f5f7fa;
 }
 
@@ -69,11 +88,11 @@ export default {
     cursor: pointer;
   }
 
-  & ::v-deep .table-content {
+  & :deep(.table-content) {
     margin-left: 21px;
   }
 
-  & ::v-deep .el-table__row {
+  & :deep(.el-table__row) {
     height: 40px;
 
     & > td {
@@ -92,7 +111,7 @@ export default {
   flex-direction: column;
 
   .hintWrap {
-    color: #D4D6E6;
+    color: #d4d6e6;
     display: flex;
     align-items: flex-start;
     justify-content: center;

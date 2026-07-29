@@ -1,10 +1,6 @@
 <template>
   <div>
-    <ListTable
-      ref="listTable"
-      :header-actions="headerActions"
-      :table-config="tableConfig"
-    />
+    <ListTable ref="listTable" :header-actions="headerActions" :table-config="tableConfig" />
   </div>
 </template>
 
@@ -30,10 +26,7 @@ export default {
         columnsExclude: ['users', 'assets', 'accounts'],
         columnsShow: {
           min: ['name', 'actions'],
-          default: [
-            'name', 'command_groups', 'priority',
-            'is_active', 'comment', 'actions'
-          ]
+          default: ['name', 'command_groups_amount', 'priority', 'is_active', 'comment', 'actions']
         },
         columnsMeta: {
           name: {
@@ -42,11 +35,11 @@ export default {
               route: 'CommandFilterACLDetail'
             }
           },
-          command_groups: {
+          command_groups_amount: {
             width: '160px',
             formatter: AmountFormatter,
             formatterArgs: {
-              route: 'AccountGatherList',
+              async: true,
               getRoute({ row }) {
                 return {
                   name: 'CommandFilterACLList',

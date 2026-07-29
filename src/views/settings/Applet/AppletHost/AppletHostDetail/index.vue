@@ -1,10 +1,5 @@
 <template>
-  <GenericDetailPage
-    :active-menu.sync="config.activeMenu"
-    :object.sync="host"
-    v-bind="config"
-    v-on="$listeners"
-  >
+  <GenericDetailPage v-bind="config" v-model:active-menu="config.activeMenu" v-model:object="host">
     <keep-alive>
       <component :is="config.activeMenu" :object="host" />
     </keep-alive>
@@ -13,9 +8,9 @@
 
 <script>
 import { GenericDetailPage, TabPage } from '@/layout/components'
-import Detail from './Detail'
-import Applets from './Applets'
 import Accounts from './Accounts'
+import Applets from './Applets'
+import Detail from './Detail'
 import Developments from './Devployments'
 
 export default {
@@ -37,20 +32,20 @@ export default {
         activeMenu: 'Detail',
         submenu: [
           {
-            'title': this.$t('Basic'),
-            'name': 'Detail'
+            title: this.$t('Basic'),
+            name: 'Detail'
           },
           {
             title: this.$t('AssetAccount'),
             name: 'Accounts'
           },
           {
-            'title': this.$t('Applets'),
-            'name': 'Applets'
+            title: this.$t('Applets'),
+            name: 'Applets'
           },
           {
-            'title': this.$t('HostDeployment'),
-            'name': 'Developments'
+            title: this.$t('HostDeployment'),
+            name: 'Developments'
           }
         ],
         hasRightSide: true,
@@ -58,22 +53,20 @@ export default {
           canDelete: this.$hasPerm('terminal.delete_applethost'),
           canUpdate: this.$hasPerm('terminal.change_applethost'),
           deleteSuccessRoute: 'Applets',
-          updateCallback: () => {
-            this.$router.push({
+          updateRoute: () => {
+            const platformId = this.host?.platform?.id || 'RemoteAppHost'
+            return {
               name: 'AppletHostUpdate',
-              params: { id: this.$route.params.id },
-              query: { platform: this.host.platform.id }
-            })
+              params: { id: this.host.id },
+              query: { platform: platformId }
+            }
           }
         }
       }
     }
   },
-  mounted() {
-  }
+  mounted() {}
 }
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

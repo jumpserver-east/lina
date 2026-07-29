@@ -1,37 +1,51 @@
 <template>
-  <Page :class="{drawer: drawer}" v-bind="$attrs">
+  <Page v-bind="pageAttrs" :class="{ drawer: drawer }">
     <IBox>
-      <GenericCreateUpdateForm ref="createUpdateForm" v-bind="$attrs" v-on="$listeners" />
+      <GenericCreateUpdateForm v-bind="$attrs" ref="createUpdateForm" />
     </IBox>
   </Page>
 </template>
 <script>
 import IBox from '@/components/Common/IBox'
 import Page from '@/layout/components/Page'
+import { getRuntimeActionMeta, isOverlayRuntime } from '@/libs/context/runtime'
 import GenericCreateUpdateForm from '../GenericCreateUpdateForm'
 
 export default {
   name: 'GenericCreateUpdatePage',
   components: {
-    Page, IBox, GenericCreateUpdateForm
+    Page,
+    IBox,
+    GenericCreateUpdateForm
+  },
+  computed: {
+    pageAttrs() {
+      return {
+        ...this.$attrs,
+        hideHeading: this.drawer
+      }
+    }
   },
   data() {
     return {
       drawer: false
     }
   },
-  mounted() {
-    this.$store.dispatch('common/getDrawerActionMeta').then((res) => {
-      if (res.action) {
-        this.drawer = true
-      }
-    })
+  async mounted() {
+    if (isOverlayRuntime(this)) {
+      this.drawer = true
+      return
+    }
+    const actionMeta = await getRuntimeActionMeta(this)
+    if (actionMeta?.action) {
+      this.drawer = true
+    }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-::v-deep .ibox {
+:deep(.ibox) {
   margin: 0 10px 30px 0;
 
   .el-card__body {
@@ -40,7 +54,7 @@ export default {
   }
 }
 
-.drawer ::v-deep .page-heading {
+.drawer :deep(.page-heading) {
   display: none;
 }
 </style>

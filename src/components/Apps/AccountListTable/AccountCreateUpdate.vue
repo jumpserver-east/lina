@@ -1,7 +1,7 @@
-<template v-if="iVisible">
+<template>
   <Drawer
+    v-model:visible="iVisible"
     :title="title"
-    :visible="iVisible"
     class="drawer"
     @close-drawer="handleCloseDrawer"
   >
@@ -26,6 +26,7 @@ import Drawer from '@/components/Drawer/index.vue'
 import AccountCreateUpdateForm from '@/components/Apps/AccountCreateUpdateForm/index.vue'
 import IBox from '@/components/Common/IBox/index.vue'
 import Page from '@/layout/components/Page/index.vue'
+import { useVModel } from '@/utils/vue/useVModel'
 
 export default {
   name: 'CreateAccountDialog',
@@ -54,9 +55,20 @@ export default {
     },
     title: {
       type: String,
-      default: function() {
-        return this.$t('AddAccount')
+      default() {
+        return 'AddAccount'
       }
+    },
+    operationFlag: {
+      type: String,
+      default: ''
+    }
+  },
+  emits: ['update:visible', 'add', 'bulk-create-done'],
+  setup(props, { emit }) {
+    const iVisible = useVModel(props, emit, 'visible')
+    return {
+      iVisible
     }
   },
   data() {
@@ -68,14 +80,6 @@ export default {
   computed: {
     protocols() {
       return this.asset ? this.asset.protocol : []
-    },
-    iVisible: {
-      get() {
-        return this.visible
-      },
-      set(val) {
-        this.$emit('update:visible', val)
-      }
     }
   },
   methods: {
@@ -93,31 +97,37 @@ export default {
         iVisible = true
         data = formValue
         url = `/api/v1/accounts/accounts/bulk/`
-        if ((!data.assets || data.assets.length === 0) && (!data.nodes || data.nodes.length === 0)) {
+        if (
+          (!data.assets || data.assets.length === 0) &&
+          (!data.nodes || data.nodes.length === 0)
+        ) {
           this.$message.error(this.$tc('PleaseSelectAssetOrNode'))
           return
         }
       }
-      this.$axios.post(url, data, {
-        disableFlashErrorMsg: iVisible
-      }).then((data) => {
-        this.handleResult(data, null)
-        this.iVisible = iVisible
-        if (!iVisible) {
-          this.$emit('add', true)
-        }
-      }).catch(error => {
-        if (error?.response?.data?.code === 'no_valid_assets') {
-          this.$message.error(error?.response?.data?.detail)
-          return
-        }
-        this.iVisible = true
-        this.handleResult(null, error)
-      })
+      this.$axios
+        .post(url, data, {
+          disableFlashErrorMsg: iVisible
+        })
+        .then((data) => {
+          this.handleResult(data, null)
+          this.$emit('update:visible', iVisible)
+          if (!iVisible) {
+            this.$emit('add', true)
+          }
+        })
+        .catch((error) => {
+          if (error?.response?.data?.code === 'no_valid_assets') {
+            this.$message.error(error?.response?.data?.detail)
+            return
+          }
+          this.$emit('update:visible', true)
+          this.handleResult(null, error)
+        })
     },
     editAccount(form) {
       const data = { ...form }
-      const flag = this.$route.query.flag
+      const flag = this.operationFlag
 
       switch (flag) {
         case 'copy':
@@ -127,11 +137,14 @@ export default {
           this.handleAccountOperation(this.account.id, 'move-to-assets', data)
           break
         default:
-          this.$axios.patch(`/api/v1/accounts/accounts/${this.account.id}/`, data).then(() => {
-            this.iVisible = false
-            this.$emit('add', true)
-            this.$message.success(this.$tc('UpdateSuccessMsg'))
-          }).catch(error => this.setFieldError(error))
+          this.$axios
+            .patch(`/api/v1/accounts/accounts/${this.account.id}/`, data)
+            .then(() => {
+              this.$emit('update:visible', false)
+              this.$emit('add', true)
+              this.$message.success(this.$tc('UpdateSuccessMsg'))
+            })
+            .catch((error) => this.setFieldError(error))
       }
     },
     handleResult(resp, error) {
@@ -187,15 +200,17 @@ export default {
       }
     },
     handleCloseDrawer() {
-      this.iVisible = false
-      // Reflect.deleteProperty(this.$route.query, 'flag')
+      this.$emit('update:visible', false)
     },
     handleAccountOperation(id, path, data) {
-      this.$axios.post(`/api/v1/accounts/accounts/${id}/${path}/`, data).then((res) => {
-        this.iVisible = false
-        this.$emit('add', true)
-        this.handleResult(res, null)
-      }).catch(error => this.handleResult(null, error))
+      this.$axios
+        .post(`/api/v1/accounts/accounts/${id}/${path}/`, data)
+        .then((res) => {
+          this.$emit('update:visible', false)
+          this.$emit('add', true)
+          this.handleResult(res, null)
+        })
+        .catch((error) => this.handleResult(null, error))
     }
   }
 }
@@ -203,8 +218,7 @@ export default {
 
 <style lang="scss" scoped>
 .drawer {
-  ::v-deep .el-drawer__body {
-
+  :deep(.el-drawer__body) {
     .el-form {
       margin-right: 30px;
     }

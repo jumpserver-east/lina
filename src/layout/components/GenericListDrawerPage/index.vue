@@ -1,11 +1,10 @@
 <template>
-  <Page v-bind="$attrs">
+  <Page v-bind="pageAttrs">
     <DrawerListTable
+      v-bind="$attrs"
       ref="ListTable"
       :header-actions="headerActions"
       :table-config="tableConfig"
-      v-bind="$attrs"
-      v-on="$listeners"
     />
   </Page>
 </template>
@@ -13,11 +12,13 @@
 <script>
 import Page from '@/layout/components/Page'
 import DrawerListTable from '@/components/Table/DrawerListTable/index'
+import { getRuntimeActionMeta, isOverlayRuntime } from '@/libs/context/runtime'
 
 export default {
   name: 'GenericListDrawerPage',
   components: {
-    Page, DrawerListTable
+    Page,
+    DrawerListTable
   },
   props: {
     tableConfig: {
@@ -30,7 +31,27 @@ export default {
     }
   },
   data() {
-    return {}
+    return {
+      drawer: false
+    }
+  },
+  computed: {
+    pageAttrs() {
+      return {
+        ...this.$attrs,
+        hideHeading: this.drawer
+      }
+    }
+  },
+  async mounted() {
+    if (isOverlayRuntime(this)) {
+      this.drawer = true
+      return
+    }
+    const actionMeta = await getRuntimeActionMeta(this)
+    if (actionMeta?.action) {
+      this.drawer = true
+    }
   },
   methods: {
     reloadTable() {

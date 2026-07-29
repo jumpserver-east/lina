@@ -1,6 +1,6 @@
 <template>
   <TabPage
-    :active-menu.sync="iActiveMenu"
+    v-model:active-menu="iActiveMenu"
     :submenu="iSubmenu"
     :title="iTitle"
     class="generic-detail-page"
@@ -8,11 +8,7 @@
   >
     <template #headingRightSide>
       <span v-if="hasRightSide">
-        <ActionsGroup
-          slot="headingRightSide"
-          :actions="pageActions"
-          class="header-buttons"
-        />
+        <ActionsGroup :actions="pageActions" class="header-buttons" />
       </span>
     </template>
     <div v-if="!loading">
@@ -26,11 +22,8 @@ import TabPage from '../TabPage'
 import { flashErrorMsg } from '@/utils/request'
 import { getApiPath } from '@/utils/common/index'
 import ActionsGroup from '@/components/Common/ActionsGroup'
-import ResourceActivity from '@/components/Apps/ResourceActivity/index.vue'
+import { getRuntimeActionMeta } from '@/libs/context/runtime'
 import { mapGetters } from 'vuex'
-import Vue from 'vue'
-
-Vue.component('ResourceActivity', ResourceActivity)
 
 export default {
   name: 'GenericDetailPage',
@@ -78,36 +71,35 @@ export default {
     },
     getObjectName: {
       type: Function,
-      default: function(obj) {
+      default: function (obj) {
         return obj.name
       }
     },
     getTitle: {
       type: Function,
-      default: function(obj) {
-        const objectType = this.$route.meta.title
-          .replace('Details', '')
-          .replace('Detail', '')
-          .replace('详情', '')
-          .trim()
-        this.$log.debug('Object is: ', obj)
-        const titlePrefix = this.titlePrefix || objectType
-        const objectName = this.getObjectName(obj)
-        let title = `${titlePrefix}: ${objectName}`
-        if (title.length > 80) {
-          title = title.slice(0, 80) + '...'
-        }
-        return title
+      default: function (obj) {
+        const objectName = obj?.name || ''
+        return objectName
       }
     }
   },
+  emits: [
+    'update:activeMenu',
+    'tab-click',
+    'update:object',
+    'getObjectDone',
+    'close-drawer',
+    'detail-delete-success',
+    'open-update-drawer',
+    'reload-table'
+  ],
   data() {
     const vm = this
     const defaultActions = {
       // Delete button
       canDelete: vm.$hasCurrentResAction('delete'),
       hasDelete: true,
-      deleteCallback: function(item) {
+      deleteCallback: function (item) {
         vm.defaultDelete(item)
       },
       deleteSuccessRoute: this.$route.name.replace('Detail', 'List'),
@@ -116,7 +108,7 @@ export default {
         return !vm.currentOrgIsRoot && vm.$hasCurrentResAction('change')
       },
       hasUpdate: true,
-      updateCallback: function(item) {
+      updateCallback: function (item) {
         this.defaultUpdate(item)
       },
       updateRoute: this.$route.name.replace('Detail', 'Update')
@@ -141,11 +133,12 @@ export default {
           icon: 'el-icon-edit-outline',
           size: 'small',
           can: this.validActions.canUpdate,
-          has: this.validActions.hasUpdate && !this.drawer,
+          has: this.validActions.hasUpdate,
           callback: this.validActions.updateCallback.bind(this)
         },
         {
           name: 'delete',
+          title: this.$t('Delete'),
           type: 'danger',
           plain: true,
           icon: 'el-icon-delete',
@@ -192,8 +185,11 @@ export default {
     }
   },
   methods: {
+    async getDrawerMeta() {
+      return getRuntimeActionMeta(this)
+    },
     async checkDrawer() {
-      const drawActionMeta = await this.$store.dispatch('common/getDrawerActionMeta')
+      const drawActionMeta = await this.getDrawerMeta()
       if (drawActionMeta && drawActionMeta.action) {
         this.drawer = true
         this.row = drawActionMeta.row
@@ -202,7 +198,7 @@ export default {
     },
     getDetailUrl() {
       const vm = this
-      const objectId = this.actionId || this.$route.params.id
+      const objectId = this.actionId || this.$context.get('id')
       // 兼容之前的 detailApiUrl
       if (vm.validActions.detailApiUrl || vm.detailApiUrl) {
         return vm.validActions.detailApiUrl || vm.detailApiUrl
@@ -212,10 +208,9 @@ export default {
     },
     afterDelete() {
       if (this.drawer) {
-        this.$store.dispatch('common/finishDrawerActionMeta', {
-          action: 'delete',
-          row: this.object
-        })
+        this.$emit('close-drawer')
+        this.$emit('detail-delete-success')
+        this.$emit('reload-table')
       } else {
         this.$message.success(this.$tc('DeleteSuccessMsg'))
         this.$router.push({ name: this.validActions.deleteSuccessRoute })
@@ -257,32 +252,56 @@ export default {
       })
     },
     defaultUpdate() {
-      const id = this.$route.params.id
+      const id = this.actionId || this.$context.get('id')
       let route = this.validActions.updateRoute
+      if (typeof route === 'function') {
+        route = route({
+          object: this.object,
+          row: this.row,
+          id
+        })
+      }
+      if (this.drawer) {
+        const row = this.object?.id ? this.object : { ...(this.row || {}), id }
+        this.$emit('open-update-drawer', {
+          row,
+          query: route?.query || {}
+        })
+        return
+      }
       if (typeof route === 'string') {
         route = { name: route, params: {} }
       }
       route = {
         ...route,
-        query: this.$route.query || {}
+        query: {
+          ...(this.$route.query || {}),
+          ...(route?.query || {})
+        }
       }
-      route.params.id = id
+      route.params = {
+        ...(route.params || {}),
+        id
+      }
       this.$router.push(route)
     },
     getObject() {
       // 兼容之前的 detailApiUrl
       const url = this.getDetailUrl()
-      return this.$axios.get(url, { disableFlashErrorMsg: true }).then(data => {
-        this.$emit('update:object', data)
-        this.$emit('getObjectDone', data)
-      }).catch(error => {
-        if (error.response && error.response.status === 404) {
-          const msg = this.$tc('ObjectNotFoundOrDeletedMsg')
-          this.$message.error(msg)
-        } else {
-          flashErrorMsg({ error, response: error.response })
-        }
-      })
+      return this.$axios
+        .get(url, { disableFlashErrorMsg: true })
+        .then((data) => {
+          this.$emit('update:object', data)
+          this.$emit('getObjectDone', data)
+        })
+        .catch((error) => {
+          if (error.response && error.response.status === 404) {
+            const msg = this.$tc('ObjectNotFoundOrDeletedMsg')
+            this.$message.error(msg)
+          } else {
+            flashErrorMsg({ error, response: error.response })
+          }
+        })
     },
     handleTabClick(tab) {
       this.$emit('tab-click', tab, this.iActiveMenu)
@@ -296,14 +315,5 @@ export default {
 <style lang="scss" scoped>
 .header-buttons {
   z-index: 999;
-}
-
-.generic-detail-page {
-  ::v-deep {
-    .tab-page-content {
-      padding-left: 20px;
-      padding-right: 15px;
-    }
-  }
 }
 </style>

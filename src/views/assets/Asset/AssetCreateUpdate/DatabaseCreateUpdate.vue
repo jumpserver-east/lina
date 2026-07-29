@@ -19,7 +19,7 @@ export default {
   },
   methods: {
     getAddFields() {
-      const platform = this.$route.query.type
+      const platform = this.$context.get('type')
       const baseFields = [[this.$t('Basic'), ['db_name']]]
       let tlsFields = ['use_ssl', 'ca_cert']
       const platformFieldsMap = {
@@ -33,15 +33,13 @@ export default {
         tlsFields = tlsFields.concat(platformFieldsMap[platform])
       }
       if (tlsFields.length > 2) {
-        const secureField = [
-          this.$t('Secure'), tlsFields, 2
-        ]
+        const secureField = [this.$t('Secure'), tlsFields, 2]
         baseFields.push(secureField)
       }
       return baseFields
     },
     getAddFieldsMeta() {
-      const platform = this.$route.query.type
+      const platform = this.$context.get('type')
       const fieldsMeta = {
         db_name: {
           label: this.$t('DefaultDatabase')
@@ -100,5 +98,4 @@ export default {
 }
 </script>
 
-<style>
-</style>
+<style></style>

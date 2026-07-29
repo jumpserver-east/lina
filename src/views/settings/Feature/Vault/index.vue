@@ -1,6 +1,10 @@
 <template>
   <div>
-    <el-alert v-sanitize="helpText" type="info" />
+    <el-alert type="info">
+      <template #default>
+        <div v-sanitize="helpText" />
+      </template>
+    </el-alert>
     <IBox>
       <GenericCreateUpdateForm v-bind="$data" />
     </IBox>
@@ -12,6 +16,7 @@ import { GenericCreateUpdateForm } from '@/layout/components'
 import IBox from '@/components/Common/IBox/index.vue'
 import { openTaskPage } from '@/utils/jms/index'
 import store from '@/store'
+import OpenBaoKV from './OpenBao.vue'
 import HashiCorpKV from './HCP.vue'
 import AzureKV from './Azure.vue'
 import AwsSM from './Aws.vue'
@@ -32,24 +37,25 @@ export default {
           title: this.$t('Sync'),
           loading: false,
           disabled: !store.getters.publicSettings['VAULT_ENABLED'],
-          callback: function(value, form, btn) {
+          callback: function (value, form, btn) {
             btn.loading = true
-            vm.$axios.post(
-              '/api/v1/settings/vault/sync/',
-              value
-            ).then(res => {
-              openTaskPage(res['task'])
-            }).catch(() => {
-              vm.$log.error('err occur')
-            }).finally(() => {
-              btn.loading = false
-            })
+            vm.$axios
+              .post('/api/v1/settings/vault/sync/', value)
+              .then((res) => {
+                openTaskPage(res['task'])
+              })
+              .catch(() => {
+                vm.$log.error('err occur')
+              })
+              .finally(() => {
+                btn.loading = false
+              })
           }
         }
       ],
       fields: [
         [this.$t('Basic'), ['VAULT_ENABLED', 'VAULT_BACKEND', 'HISTORY_ACCOUNT_CLEAN_LIMIT']],
-        [this.$t('Provider'), ['HCP', 'AZURE', 'AWS']]
+        [this.$t('Provider'), ['OPENBAO', 'HCP', 'AZURE', 'AWS']]
       ],
       fieldsMeta: {
         HISTORY_ACCOUNT_CLEAN_LIMIT: {
@@ -66,6 +72,13 @@ export default {
             return !formValue.VAULT_ENABLED || formValue['VAULT_BACKEND'] === 'local'
           },
           disabled: true
+        },
+        OPENBAO: {
+          label: this.$t('OpenBao'),
+          component: OpenBaoKV,
+          hidden: (formValue) => {
+            return !formValue.VAULT_ENABLED || formValue['VAULT_BACKEND'] !== 'openbao'
+          }
         },
         HCP: {
           label: this.$t('HashicorpVault'),
@@ -97,6 +110,4 @@ export default {
 }
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

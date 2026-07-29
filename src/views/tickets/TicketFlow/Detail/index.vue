@@ -1,5 +1,9 @@
 <template>
-  <GenericDetailPage :active-menu.sync="config.activeMenu" :object.sync="ticket" v-bind="config" v-on="$listeners">
+  <GenericDetailPage
+    v-bind="config"
+    v-model:active-menu="config.activeMenu"
+    v-model:object="ticket"
+  >
     <component :is="config.activeMenu" :object="ticket" />
   </GenericDetailPage>
 </template>
@@ -16,19 +20,22 @@ export default {
   },
   data() {
     return {
-      ticket: { user_display: '', type_display: '', status: '', assignees_display: '', date_created: '' },
+      ticket: {
+        user_display: '',
+        type_display: '',
+        status: '',
+        assignees_display: '',
+        date_created: ''
+      },
       config: {
         activeMenu: 'TicketDetail',
-        url: '',
+        url: '/api/v1/tickets/flows',
         submenu: [
           {
             title: this.$t('TicketDetail'),
             name: 'TicketDetail'
           }
         ],
-        actions: {
-          detailApiUrl: `/api/v1/tickets/flows/${this.$route.params.id}/`
-        },
         hasRightSide: false
       }
     }
