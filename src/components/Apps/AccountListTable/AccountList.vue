@@ -202,15 +202,6 @@ export default {
               }
             }
           },
-          secret: {
-            formatter: SecretViewerFormatter,
-            width: '130px',
-            formatterArgs: {
-              secretFrom: 'api',
-              hasDownload: false,
-              actionLeft: true
-            }
-          },
           connect: {
             label: this.$t('Connect'),
             width: '80px',
