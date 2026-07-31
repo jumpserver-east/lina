@@ -20,6 +20,7 @@
 <script>
 import { getLangCode } from '@/i18n/utils'
 import store from '@/store'
+import { setDayjsLocale } from '@/utils/dayjs'
 
 export default {
   name: 'Language',
@@ -54,12 +55,12 @@ export default {
         cookieCode: item.code
       }
     })
-    this.changeMomentLang()
+    this.changeDayjsLang()
   },
   methods: {
-    changeMomentLang() {
+    changeDayjsLang() {
       const lang = getLangCode()
-      this.$moment.locale(lang)
+      setDayjsLocale(lang)
       document.documentElement.lang = lang
     },
     changeLangTo(item) {

@@ -10,7 +10,7 @@
       <div class="content">
         <div class="operational">
           <div v-if="!hasReasoning" class="date">
-            {{ $moment(item.message.create_time).format('YYYY-MM-DD HH:mm:ss') }}
+            {{ $dayjs(item.message.create_time).format('YYYY-MM-DD HH:mm:ss') }}
           </div>
 
           <div v-else :class="{ 'is-thinking': isThinking }" class="thinking-time">

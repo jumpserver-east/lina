@@ -29,11 +29,11 @@ import ResourceActivity from '@/components/Apps/ResourceActivity'
 import request from '@/utils/request'
 import { message } from '@/utils/vue/message'
 import xss from '@/utils/secure'
-import moment from 'moment'
+import dayjs, { setDayjsLocale } from '@/utils/dayjs'
 import DOMPurify from 'dompurify'
 import _ from 'lodash'
 
-moment.locale('zh-cn')
+setDayjsLocale(getLangCode())
 
 // 构建时间：生产环境为 Docker 构建时刻，开发环境为 dev server 启动时刻（见 vite.config.js）
 // 用双色徽章样式打印，与其它 console 信息区分开。
@@ -94,7 +94,7 @@ async function initApp() {
   // 全局注册动态组件(被 GenericDetailPage submenu 按字符串 name 引用)
   app.component('ResourceActivity', ResourceActivity)
 
-  app.config.globalProperties.$moment = moment
+  app.config.globalProperties.$dayjs = dayjs
   app.config.globalProperties.$axios = request
   app.config.globalProperties.$message = message
   app.config.globalProperties.$xss = xss

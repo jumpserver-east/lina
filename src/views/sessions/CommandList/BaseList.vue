@@ -40,7 +40,7 @@ export default {
   },
   data() {
     const dateFrom = getDaysAgo(7).toISOString()
-    const dateTo = this.$moment(getDayEnd()).add(1, 'day').toISOString()
+    const dateTo = this.$dayjs(getDayEnd()).add(1, 'day').toISOString()
     return {
       title: this.$t('CommandStorage'),
       loading: true,
