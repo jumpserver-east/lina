@@ -50,7 +50,7 @@ export default {
       activities: [
         {
           content: this.$t('Now'),
-          timestamp: toSafeLocalDateStr(this.$moment()),
+          timestamp: toSafeLocalDateStr(this.$dayjs()),
           type: 'primary'
         }
       ]

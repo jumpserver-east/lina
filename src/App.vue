@@ -75,7 +75,7 @@ export default {
       const userId = user?.id || ''
       const name = user?.name || ''
       const userName = user?.username || ''
-      const currentTime = this.$moment(new Date()).format('YYYY-MM-DD HH:mm:ss')
+      const currentTime = this.$dayjs(new Date()).format('YYYY-MM-DD HH:mm:ss')
       return { userId, name, userName, currentTime }
     },
     getWaterMarkContent() {

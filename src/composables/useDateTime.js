@@ -1,6 +1,6 @@
 import { getLangCode } from '@/i18n/utils'
 import store from '@/store'
-import moment from 'moment'
+import dayjs from '@/utils/dayjs'
 import { getDayFuture, safeDate } from '@/utils/common/time'
 
 /**
@@ -69,7 +69,7 @@ export function toSafeLocalDateStr(value) {
   }
   const date = safeDate(value)
   const dateFormat = getDateFormatByTimezone()
-  return moment(date).format(`${dateFormat} HH:mm:ss`)
+  return dayjs(date).format(`${dateFormat} HH:mm:ss`)
 }
 
 export function getDefaultExpiredDays() {

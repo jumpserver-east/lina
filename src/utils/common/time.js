@@ -1,4 +1,4 @@
-import moment from 'moment'
+import dayjs from '@/utils/dayjs'
 
 export function safeDate(s) {
   s = cleanDateStr(s)
@@ -45,8 +45,8 @@ export function getDayEnd(now) {
   if (!now) {
     now = new Date()
   }
-  const zoneTime = moment(now).utc().endOf('day').format('YYYY-MM-DD HH:mm:ss')
-  return moment(zoneTime).utc().toDate()
+  const zoneTime = dayjs(now).utc().endOf('day').format('YYYY-MM-DD HH:mm:ss')
+  return dayjs(zoneTime).utc().toDate()
 }
 
 export function getDayFuture(days, now) {
