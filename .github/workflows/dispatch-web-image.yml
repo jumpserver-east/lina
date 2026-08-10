@@ -1,0 +1,125 @@
+name: Dispatch Complete Web Image Build
+
+on:
+  create:
+  workflow_run:
+    workflows:
+      - JumpServer repos generic handler
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit SHA to build
+        required: true
+        default: dev
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dispatch-web-${{ github.event.workflow_run.head_sha || inputs.ref || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  dispatch:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'create' && github.event.ref_type == 'branch') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Resolve source revision
+        id: source
+        shell: bash
+        env:
+          CREATE_REF: ${{ github.event.ref }}
+          MANUAL_REF: ${{ inputs.ref }}
+          WORKFLOW_RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          case "${GITHUB_EVENT_NAME}" in
+            workflow_run)
+              source_ref="${WORKFLOW_RUN_SHA}"
+              source_branch="${WORKFLOW_RUN_BRANCH}"
+              ;;
+            create)
+              source_ref="${CREATE_REF}"
+              source_branch="${CREATE_REF}"
+              ;;
+            workflow_dispatch)
+              source_ref="${MANUAL_REF}"
+              source_branch="${MANUAL_REF}"
+              ;;
+          esac
+
+          echo "ref=${source_ref}" >> "${GITHUB_OUTPUT}"
+          echo "branch=${source_branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.ref }}
+          fetch-depth: 1
+
+      - name: Resolve exact commit SHA
+        id: revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Dispatch Docker Web build
+        shell: bash
+        env:
+          DISPATCH_TOKEN: ${{ secrets.DOCKER_WEB_DISPATCH_TOKEN }}
+          SOURCE_BRANCH: ${{ steps.source.outputs.branch }}
+          SOURCE_SHA: ${{ steps.revision.outputs.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_TOKEN}" ]; then
+            echo "Repository secret DOCKER_WEB_DISPATCH_TOKEN is required." >&2
+            exit 1
+          fi
+
+          payload="$(jq -nc \
+            --arg ref "docker-build" \
+            --arg component "lina" \
+            --arg source_ref "${SOURCE_SHA}" \
+            --arg source_branch "${SOURCE_BRANCH}" \
+            '{
+              ref: $ref,
+              inputs: {
+                component: $component,
+                source_ref: $source_ref,
+                source_branch: $source_branch
+              }
+            }'
+          )"
+
+          curl --fail-with-body --silent --show-error --location \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data "${payload}" \
+            "https://api.github.com/repos/jumpserver-east/docker-web/actions/workflows/build-web-image.yml/dispatches"
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "### Docker Web build dispatched"
+            echo
+            echo "Component: \`lina\`"
+            echo
+            echo "Branch: \`${{ steps.source.outputs.branch }}\`"
+            echo
+            echo "Revision: \`${{ steps.revision.outputs.sha }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
