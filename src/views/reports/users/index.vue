@@ -54,7 +54,7 @@ const TEMPLATE_ROUTE_MAP = {
   UserChangePasswordReport: {
     key: 'ChangePassword',
     titleKey: 'UserChangePasswordReport',
-    icon: 'fa fa-key',
+    icon: 'fa-solid fa-key',
     component: ChangePassword,
     path: '/reports/users/change-password',
     perm: 'rbac.view_userchangepasswordreport'
@@ -235,7 +235,10 @@ export default {
           const correctedQuery = { ...desiredBase }
           if (rq.days) correctedQuery.days = rq.days
           if (rq.customize) correctedQuery.customize = rq.customize
-          this.$router.replace({ path: this.$route.path, query: correctedQuery })
+          this.$router.replace({
+            path: this.$route.path,
+            query: correctedQuery
+          })
           return
         }
       }
@@ -310,7 +313,6 @@ export default {
 .page {
   :deep(.page-content) {
     padding-right: 20px;
-    padding-top: 10px;
   }
 }
 
@@ -319,7 +321,7 @@ h5 {
 }
 
 .folder-list li {
-  border-bottom: 1px solid #e7eaec;
+  border-bottom: 1px solid var(--panel-border-color, var(--el-border-color));
   display: block;
   font-size: 13px;
   padding: 5px 0;

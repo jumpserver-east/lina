@@ -33,6 +33,9 @@ export default {
     const userTableActions = this.config.tableActions || {}
     const objTableSize = new ObjectLocalStorage('tableSize')
     const pathName = newURL(this.config.url).pathname
+    const paginationSizes = [15, 30, 50, 100]
+    const savedPaginationSize = Number(objTableSize.get(pathName))
+    const hasSavedPageSize = paginationSizes.includes(savedPaginationSize)
     return {
       objTableSize: objTableSize,
       pathName: pathName,
@@ -78,8 +81,8 @@ export default {
         },
         pageCount: 5,
         paginationLayout: 'total, sizes, prev, pager, next',
-        paginationSize: objTableSize.get(pathName) || 15,
-        paginationSizes: [15, 30, 50, 100],
+        paginationSize: hasSavedPageSize ? savedPaginationSize : paginationSizes[0],
+        paginationSizes,
         paginationBackground: true,
         transformQuery: (query) => {
           if (query.page && query.size) {
@@ -143,8 +146,19 @@ export default {
   watch: {},
   methods: {
     getList() {
-      this.$refs.table?.clearSelection()
-      return this.$refs.table.getList()
+      const reload = () => {
+        const table = this.$refs.table
+        if (!table) {
+          return
+        }
+        table.clearSelection()
+        return table.getList()
+      }
+
+      if (this.$refs.table) {
+        return reload()
+      }
+      return this.$nextTick(reload)
     },
     getData() {
       return this.$refs.table.data
@@ -165,6 +179,12 @@ export default {
       if (!Array.isArray(data)) {
         return
       }
+      this.$emit('loaded', {
+        data,
+        query: this.dataTable?.getQuery?.() || {},
+        response,
+        total: Number(this.dataTable?.total) || 0
+      })
       const theRowDefaultIsSelected = this.tableConfig.theRowDefaultIsSelected
       if (!theRowDefaultIsSelected || typeof theRowDefaultIsSelected !== 'function') {
         return
@@ -175,11 +195,11 @@ export default {
           this.toggleRowSelection(row, true)
         }
       }
-
-      this.$emit('loaded')
     },
     handleSizeChange(val) {
-      this.objTableSize.set(this.pathName, val)
+      if (this.config.savePageSize !== false) {
+        this.objTableSize.set(this.pathName, val)
+      }
     }
   }
 }

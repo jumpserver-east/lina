@@ -34,6 +34,7 @@
             @node-search="handleNodeSearch"
           />
           <LabelSearch
+            v-bind="labelSearchConfig"
             v-if="hasLabelSearch"
             ref="labelSearch"
             class="search-filter"
@@ -45,10 +46,13 @@
             v-if="hasSearch"
             ref="autoDataSearch"
             :fold="foldSearch"
+            :get-table-metadata="getTableMetadata"
             class="right-side-item action-search search-primary"
             @conditions-change="handleTagConditionsChange"
+            @ready="handleSearchReady"
             @tag-search="handleTagSearch"
           />
+          <slot name="search-after" />
           <el-popover
             v-if="savedSearchPresets.length"
             v-model:visible="searchHistoryVisible"
@@ -141,7 +145,11 @@
         >
           <span class="condition-chip__text">
             <span v-if="condition.displayKey" class="condition-chip__key">
-              {{ condition.displayKey }}:
+              {{ condition.displayKey }}
+              <span v-if="!condition.displayOperator">:</span>
+            </span>
+            <span v-if="condition.displayOperator" class="condition-chip__operator">
+              {{ condition.displayOperator }}
             </span>
             <span class="condition-chip__value">
               {{ condition.displayValue }}
@@ -242,6 +250,10 @@ export default {
       type: Object,
       default: () => ({})
     },
+    labelSearchConfig: {
+      type: Object,
+      default: () => ({})
+    },
     nodeSearchConfig: {
       type: Object,
       default: () => ({})
@@ -249,6 +261,10 @@ export default {
     tableUrl: {
       type: String,
       default: ''
+    },
+    getTableMetadata: {
+      type: Function,
+      default: null
     },
     datePick: {
       type: Function,
@@ -280,7 +296,8 @@ export default {
       applyingSearchPreset: false,
       presetSaveVisible: false,
       presetName: '',
-      searchHistoryVisible: false
+      searchHistoryVisible: false,
+      initializationDone: false
     }
   },
   computed: {
@@ -319,18 +336,22 @@ export default {
     },
     activeSearchConditions() {
       return [
-        ...this.tagConditions.map((condition) => ({
-          ...condition,
-          id: `tag:${condition.key}`,
-          source: 'tag',
-          displayKey:
+        ...this.tagConditions.map((condition) => {
+          const fieldLabel =
             condition.label ||
-            (condition.key?.startsWith('search') ? this.$t('Search') : condition.key),
-          displayValue:
-            condition.valueLabel !== '' && condition.valueLabel != null
-              ? condition.valueLabel
-              : condition.value
-        })),
+            (condition.key?.startsWith('search') ? this.$t('Search') : condition.key)
+          return {
+            ...condition,
+            id: `tag:${condition.conditionKey || condition.key}`,
+            source: 'tag',
+            displayKey: fieldLabel,
+            displayOperator: this.getConditionOperatorLabel(condition),
+            displayValue:
+              condition.valueLabel !== '' && condition.valueLabel != null
+                ? condition.valueLabel
+                : condition.value
+          }
+        }),
         ...this.labelConditions,
         ...(this.nodeCondition ? [this.nodeCondition] : [])
       ]
@@ -368,10 +389,22 @@ export default {
       immediate: true
     }
   },
-  created() {
-    this.$emit('done')
+  mounted() {
+    if (!this.hasSearch) {
+      this.completeInitialization()
+    }
   },
   methods: {
+    completeInitialization() {
+      if (this.initializationDone) {
+        return
+      }
+      this.initializationDone = true
+      this.$emit('done')
+    },
+    handleSearchReady() {
+      this.completeInitialization()
+    },
     focusSearch() {
       return this.$refs.autoDataSearch?.focusSearch()
     },
@@ -454,7 +487,7 @@ export default {
     },
     removeSearchCondition(condition) {
       if (condition.source === 'tag') {
-        this.$refs.autoDataSearch?.removeCondition(condition.key)
+        this.$refs.autoDataSearch?.removeCondition(condition.conditionKey || condition.key)
       } else if (condition.source === 'label') {
         this.$refs.labelSearch?.removeLabel(condition.value)
       } else if (condition.source === 'node') {
@@ -474,10 +507,35 @@ export default {
         nodeSelection: _.cloneDeep(this.nodeSelectionSnapshot)
       }
     },
+    getConditionOperator(condition) {
+      let operator = condition?.operator
+      const values = String(condition?.value || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+      if (condition?.key?.startsWith('search') && values.length <= 1) {
+        operator = 'icontains'
+      }
+      return operator
+    },
+    getConditionOperatorLabel(condition) {
+      const operator = this.getConditionOperator(condition)
+      const labels = {
+        exact: this.$t('SearchOperatorEquals'),
+        icontains: this.$t('SearchOperatorContains'),
+        startswith: this.$t('SearchOperatorStartsWith'),
+        icontains_any: this.$t('SearchOperatorContainsAny'),
+        icontains_all: this.$t('SearchOperatorContainsAll'),
+        in: this.$t('SearchOperatorEqualsAny')
+      }
+      return labels[operator] || ''
+    },
     getTagConditionTitle(condition, preset) {
-      const label =
+      const baseLabel =
         condition?.label ||
         (condition?.key?.startsWith('search') ? this.$t('Search') : condition?.key || '')
+      const operatorLabel = this.getConditionOperatorLabel(condition)
+      const label = operatorLabel ? `${baseLabel} ${operatorLabel}`.trim() : baseLabel
       let value =
         condition?.valueLabel !== '' && condition?.valueLabel != null
           ? condition.valueLabel
@@ -485,7 +543,11 @@ export default {
 
       if ((value === '' || value == null) && preset?.tagSearchQuery) {
         const queryKey = Object.keys(preset.tagSearchQuery).find((key) => {
-          return key === condition?.key || key.replace(/__icontains$/, '') === condition?.key
+          return (
+            key === condition?.key ||
+            key.replace(/__(?:exact|icontains|icontains_any|icontains_all|in)$/, '') ===
+              condition?.key
+          )
         })
         value = queryKey ? preset.tagSearchQuery[queryKey] : value
       }
@@ -653,18 +715,13 @@ $color-drop-menu-border: #e4e7ed;
   // }
 
   .left-side {
-    display: block;
+    --data-actions-gap: 5px;
+
+    display: inline-flex;
     //float: left;
 
     :deep(.action-item.el-dropdown > .el-button) {
       min-height: 30px;
-    }
-
-    :deep(.action-item) {
-      margin-left: 5px;
-      &:first-child {
-        margin-left: 0;
-      }
     }
 
     :deep(.action-item.el-button) {
@@ -696,27 +753,27 @@ $color-drop-menu-border: #e4e7ed;
 
     // 搜索框与前后的图标按钮保持清晰间距。
     .right-side-item.action-search {
-      flex: 0 1 240px;
+      flex: 0 0 280px;
       box-sizing: border-box;
-      width: 240px;
+      width: 280px;
       min-height: 30px;
-      min-width: min(240px, 100%);
-      max-width: 100%;
+      min-width: 280px;
+      max-width: 280px;
       font-size: 13px;
       border: 1px solid var(--color-border);
-      border-radius: 4px;
+      border-radius: var(--list-corner-radius, 4px);
       overflow: hidden;
-      transition:
-        border-color 0.2s,
-        box-shadow 0.2s;
+      outline: none;
+      box-shadow: none;
+      transition: none;
 
-      &:hover {
-        border-color: var(--color-border);
-      }
-
+      &:hover,
+      &:focus,
+      &:focus-visible,
       &:focus-within {
-        border-color: var(--color-border);
-        box-shadow: none;
+        border-color: var(--color-border) !important;
+        outline: none;
+        box-shadow: none !important;
       }
     }
 
@@ -742,7 +799,7 @@ $color-drop-menu-border: #e4e7ed;
       padding: 0;
       color: var(--color-text-primary) !important;
       border: 0;
-      border-radius: 4px;
+      border-radius: var(--list-corner-radius, 4px);
       background-color: transparent;
 
       .svg-icon {
@@ -791,6 +848,30 @@ $color-drop-menu-border: #e4e7ed;
   margin: 0;
   padding: 0;
   gap: 10px 4px;
+
+  :deep(.el-button:not(.is-circle)) {
+    border-radius: var(--list-corner-radius, 4px);
+  }
+
+  :deep(.el-button-group) {
+    border-radius: var(--list-corner-radius, 4px);
+  }
+
+  :deep(.el-button-group .el-button) {
+    border-radius: 0;
+  }
+
+  :deep(.el-button-group > .el-button:first-child) {
+    border-radius: var(--list-corner-radius, 4px) 0 0 var(--list-corner-radius, 4px);
+  }
+
+  :deep(.el-button-group > .el-button:last-child) {
+    border-radius: 0 var(--list-corner-radius, 4px) var(--list-corner-radius, 4px) 0;
+  }
+
+  :deep(.el-button-group > .el-button:only-child) {
+    border-radius: var(--list-corner-radius, 4px);
+  }
 
   &.mobile {
     justify-content: flex-start;
@@ -844,9 +925,10 @@ $color-drop-menu-border: #e4e7ed;
       gap: 2px;
 
       .right-side-item.action-search {
-        flex: 0 1 clamp(160px, 20vw, 220px);
-        width: clamp(160px, 20vw, 220px);
-        min-width: min(160px, 100%);
+        flex: 0 0 clamp(240px, 28vw, 280px);
+        width: clamp(240px, 28vw, 280px);
+        min-width: clamp(240px, 28vw, 280px);
+        max-width: clamp(240px, 28vw, 280px);
       }
     }
 
@@ -881,11 +963,19 @@ $color-drop-menu-border: #e4e7ed;
       justify-content: flex-start;
       justify-self: start;
       width: 100%;
+      min-width: 0;
 
       .right-side-item.action-search {
-        flex: 0 1 clamp(140px, 50vw, 240px);
-        width: clamp(140px, 50vw, 240px);
-        min-width: 120px;
+        flex: 1 1 0;
+        width: 0;
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .search-filter,
+      .quick-filter-toggle,
+      .search-history-button {
+        flex: 0 0 auto;
       }
     }
 
@@ -917,8 +1007,8 @@ $color-drop-menu-border: #e4e7ed;
   gap: 6px;
   min-width: 0;
   padding: 8px 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
+  border: 1px solid var(--panel-border-color, var(--el-border-color));
+  border-radius: var(--list-corner-radius, 4px);
   background-color: #fff;
 
   &__active,
@@ -1015,10 +1105,28 @@ $color-drop-menu-border: #e4e7ed;
   }
 
   &__key {
-    margin-right: 4px;
     color: var(--el-text-color-secondary);
     cursor: text;
     user-select: text;
+  }
+
+  &__operator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    margin: 0 7px;
+    padding: 3px 5px;
+    color: var(--el-text-color-primary);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 10px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    background-color: var(--el-fill-color-light);
+    box-shadow: inset 0 -1px 0 var(--el-border-color-lighter);
+    cursor: default;
+    flex: 0 0 auto;
   }
 
   &__value {

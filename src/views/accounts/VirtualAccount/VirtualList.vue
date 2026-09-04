@@ -1,6 +1,6 @@
 <template>
   <div>
-    <ListTable v-bind="config" ref="listTable" :update-drawer="updateDrawer" />
+    <ListTable v-bind="config" :update-drawer="updateDrawer" />
   </div>
 </template>
 
@@ -16,6 +16,7 @@ export default {
     return {
       updateDrawer: () => import('@/views/accounts/VirtualAccount/VirtualUpdate.vue'),
       config: {
+        activationRefresh: 'never',
         tableConfig: {
           url: '/api/v1/accounts/virtual-accounts/',
           columns: ['name', 'username', 'comment'],
@@ -53,11 +54,6 @@ export default {
         }
       }
     }
-  },
-  activated() {
-    setTimeout(() => {
-      this.$refs.listTable.reloadTable()
-    }, 300)
   }
 }
 </script>

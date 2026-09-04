@@ -67,6 +67,7 @@
       v-model:visible="dialogVisible"
       :base-node-url="baseNodeUrl"
       :base-url="baseUrl"
+      :page-size="defaultPageSize"
       :tree-setting="treeSetting"
       :tree-url-query="treeUrlQuery"
       :value="selectAssets"
@@ -84,6 +85,7 @@ import { loadPlatformIcon } from '@/utils/jms/index'
 export default {
   componentName: 'SelectJobAssetDialog',
   components: { AssetSelectDialog, IBox },
+  emits: ['change'],
   props: {
     baseUrl: {
       type: String,

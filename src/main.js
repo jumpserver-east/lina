@@ -3,6 +3,8 @@ import ElementPlus from 'element-plus'
 import { getElementLocale } from '@/i18n/langs'
 import { getLangCode } from '@/i18n/utils'
 import 'element-plus/dist/index.css'
+import '@fortawesome/fontawesome-free/css/all.min.css'
+import '@fortawesome/fontawesome-free/css/v4-shims.min.css'
 // 导入 Element Plus CSS 变量配置（需要在 Element Plus 样式之后，自定义样式之前）
 import '@/styles/element-plus-vars.scss'
 // 导入默认主题配置（包含 :root CSS 变量定义）
@@ -21,7 +23,7 @@ import { installSvgIcon } from '@/icons' // icon
 import { installElementPlusIcons } from '@/icons/element-plus-icons'
 import '@/guards' // permission control
 import { installDirectives } from '@/directive'
-import i18n, { fetchTranslationsFromAPI } from './i18n/i18n'
+import i18n from './i18n/i18n'
 import ChartsPlugin from '@/libs/charts'
 import createContextService from '@/libs/context'
 import { setupErrorHandler } from '@/libs/errors'
@@ -123,7 +125,6 @@ async function initApp() {
   // 初始化默认主题变量（确保在应用启动时就注入 CSS 变量）
   setRootColors()
 
-  await fetchTranslationsFromAPI()
   watchSessions()
   // Mount app and remove initial loading overlay
   app.mount('#app')

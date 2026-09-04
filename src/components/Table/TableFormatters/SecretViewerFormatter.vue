@@ -1,28 +1,9 @@
 <template>
   <div class="content">
-    <span :class="formatterArgs.actionLeft ? 'left' : 'right'" class="action">
-      <template v-for="(item, index) in iActions">
-        <el-tooltip
-          v-if="item.has"
-          :key="index"
-          :content="item.tooltip"
-          :show-after="500"
-          effect="dark"
-          placement="top"
-        >
-          <i
-            :class="[item.class, item.icon]"
-            class="fa"
-            @mousedown.prevent
-            @click="item.action()"
-          />
-        </el-tooltip>
-      </template>
-    </span>
     <el-tooltip
       v-if="!isEdit"
-      :content="currentValue"
-      :disabled="!isShow"
+      :content="vaultUnavailable ? $t('VaultSecretUnavailableTip') : currentValue"
+      :disabled="!isShow && !vaultUnavailable"
       :show-after="500"
       placement="top"
     >
@@ -37,6 +18,26 @@
       size="small"
       @blur="onEditBlur"
     />
+
+    <span :class="formatterArgs.actionLeft ? 'left' : 'right'" class="action">
+      <template v-for="(item, index) in iActions">
+        <el-tooltip
+          v-if="item.has"
+          :key="index"
+          :content="item.tooltip"
+          :show-after="500"
+          effect="dark"
+          placement="top"
+        >
+          <i
+            :class="[item.class, item.icon, { 'show-on-hover': item.showOnHover }]"
+            class="fa"
+            @mousedown.prevent
+            @click="item.action()"
+          />
+        </el-tooltip>
+      </template>
+    </span>
   </div>
 </template>
 
@@ -59,6 +60,7 @@ export default {
           hasCopy: true,
           hasEdit: true,
           defaultShow: false,
+          showActionsOnHover: true,
           secretFrom: 'cellValue', // fromCellValue or api,
           actionLeft: false
         }
@@ -71,7 +73,8 @@ export default {
       realValue: this.cellValue,
       formatterArgs: Object.assign(this.formatterArgsDefault, this.col.formatterArgs || {}),
       isShow: false,
-      getIt: false
+      getIt: false,
+      vaultUnavailable: false
     }
   },
   computed: {
@@ -79,19 +82,22 @@ export default {
       publicSettings: 'publicSettings'
     }),
     hasShow: function () {
-      return this.formatterArgs.hasShow
+      return this.formatterArgs.hasShow && !this.isSSHCertificate && !this.vaultUnavailable
     },
     hasDownload: function () {
-      return this.formatterArgs.hasDownload
+      return this.formatterArgs.hasDownload && !this.isSSHCertificate && !this.vaultUnavailable
     },
     hasCopy: function () {
-      return this.formatterArgs.hasCopy
+      return this.formatterArgs.hasCopy && !this.isSSHCertificate && !this.vaultUnavailable
     },
     hasEdit: function () {
-      return this.formatterArgs.hasEdit
+      return this.formatterArgs.hasEdit && !this.isSSHCertificate && !this.vaultUnavailable
     },
     name: function () {
       return this.formatterArgs.name
+    },
+    isSSHCertificate() {
+      return this.row?.secret_type?.value === 'ssh_certificate'
     },
     iActions() {
       const actions = [
@@ -104,8 +110,11 @@ export default {
         {
           has: this.hasShow,
           class: this.isShow ? 'fa-eye-slash' : 'fa-eye',
-          action: this.onShow,
-          tooltip: this.$t('View')
+          action: () => {
+            this.onShow()
+          },
+          tooltip: this.$t('View'),
+          showOnHover: this.formatterArgs.showActionsOnHover
         },
         {
           has: this.hasDownload,
@@ -117,7 +126,8 @@ export default {
           has: this.hasCopy,
           icon: 'fa-clone',
           action: this.onCopy,
-          tooltip: this.$t('Copy')
+          tooltip: this.$t('Copy'),
+          showOnHover: this.formatterArgs.showActionsOnHover
         }
       ]
       if (this.formatterArgs.actionLeft) {
@@ -126,6 +136,12 @@ export default {
       return actions
     },
     currentValue() {
+      if (this.isSSHCertificate) {
+        return this.$t('DynamicCredential')
+      }
+      if (this.vaultUnavailable) {
+        return this.$t('VaultSecretUnavailable')
+      }
       if (this.isShow) {
         return this.realValue || '-'
       } else {
@@ -151,27 +167,38 @@ export default {
     async getAccountSecret() {
       if (this.publicSettings.SECURITY_DISABLE_VIEW_SECRET) {
         this.$message.warning(this.$tc('AccountSecretReadDisabled'))
-        return
+        return false
       }
       if (this.formatterArgs.secretFrom === 'cellValue' || this.getIt) {
-        return
+        return true
       }
-      const res = await this.$axios.get(`/api/v1/accounts/account-secrets/${this.row.id}/`)
-      this.realValue = res.secret
+      try {
+        const res = await this.$axios.get(`/api/v1/accounts/account-secrets/${this.row.id}/`)
+        this.realValue = res.secret
+        this.getIt = true
+        this.vaultUnavailable = false
+        return true
+      } catch (error) {
+        if (error?.response?.data?.code === 'vault_unavailable') {
+          this.vaultUnavailable = true
+          return false
+        }
+        throw error
+      }
     },
     async onShow() {
-      await this.getAccountSecret()
+      if (!(await this.getAccountSecret())) return
       this.isShow = !this.isShow
       setTimeout(() => {
         this.isShow = false
       }, 10000)
     },
     async onCopy() {
-      await this.getAccountSecret()
+      if (!(await this.getAccountSecret())) return
       copy(this.realValue)
     },
     async onDownload() {
-      await this.getAccountSecret()
+      if (!(await this.getAccountSecret())) return
       downloadText(this.realValue, this.name + '.txt')
     },
     async onEdit() {
@@ -182,7 +209,7 @@ export default {
         this.confirmEdit()
         return
       }
-      await this.getAccountSecret()
+      if (!(await this.getAccountSecret())) return
       this.isEdit = true
       this.$nextTick(() => {
         this.$refs.editInput?.focus()
@@ -238,6 +265,21 @@ export default {
         color: var(--color-primary);
       }
     }
+  }
+}
+
+@media (hover: hover) {
+  .content .action .show-on-hover {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .content:hover .action .show-on-hover {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 

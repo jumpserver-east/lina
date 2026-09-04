@@ -4,9 +4,10 @@
       v-model:visible="popoverVisible"
       :fallback-placements="['bottom-start']"
       :popper-options="popperOptions"
+      :popper-style="popperStyle"
       :show-arrow="false"
-      :width="600"
-      placement="bottom-start"
+      :width="popoverWidth"
+      :placement="placement"
       popper-class="label-filter-popper"
       trigger="click"
       @hide="handlePopoverVisibleChange(false)"
@@ -18,6 +19,7 @@
           :title="$t('LabelFilterTitle')"
           class="label-button"
           size="small"
+          @click="preparePopoverBoundary"
         >
           <svg-icon icon-class="tag" />
         </el-button>
@@ -70,7 +72,7 @@
               </template>
             </el-input>
           </div>
-          <div v-if="activeKey" class="label-filter__list">
+          <div v-if="activeKey" v-loading="valueLoading" class="label-filter__list">
             <button
               v-for="option in filteredValueOptions"
               :key="option.value"
@@ -79,11 +81,20 @@
               type="button"
               @click="selectValue(option.value)"
             >
+              <el-checkbox :model-value="isValueSelected(option.value)" tabindex="-1" />
+              <span
+                :style="{ backgroundColor: option.labelData?.color || 'transparent' }"
+                aria-hidden="true"
+                class="label-value-color"
+              />
               <span :title="option.label" class="label-filter__option-text">
                 {{ option.label }}
               </span>
             </button>
-            <div v-if="filteredValueOptions.length === 0" class="label-filter__empty">
+            <div
+              v-if="!valueLoading && filteredValueOptions.length === 0"
+              class="label-filter__empty"
+            >
               {{ $t('NoData') }}
             </div>
           </div>
@@ -98,77 +109,92 @@
 
 <script>
 import _ from 'lodash'
+import LabelSelector from '../../labelSelector'
 
 export default {
   name: 'LabelSearch',
+  mixins: [LabelSelector],
   emits: ['labelSearch', 'showLabelSearch'],
+  props: {
+    boundarySelector: {
+      type: String,
+      default: ''
+    },
+    alignToBoundaryEnd: {
+      type: Boolean,
+      default: false
+    },
+    boundaryEndGap: {
+      type: Number,
+      default: 0
+    },
+    maxWidth: {
+      type: Number,
+      default: 600
+    },
+    placement: {
+      type: String,
+      default: 'bottom-start'
+    }
+  },
   data() {
     return {
       popoverVisible: false,
-      keyLoading: false,
-      labelOptions: [],
       labelValue: [],
-      activeKey: '',
-      keyQuery: '',
-      valueQuery: '',
-      keyRequestId: 0
+      boundaryVersion: 0,
+      popoverAvailableWidth: null,
+      popoverBoundaryEndOffset: 0
     }
   },
   computed: {
-    popperOptions() {
+    labelSelectorVisible() {
+      return this.popoverVisible
+    },
+    boundaryElement() {
+      this.boundaryVersion
+      return this.findBoundaryElement()
+    },
+    popoverWidth() {
+      return Math.max(Math.min(this.maxWidth, this.popoverAvailableWidth ?? this.maxWidth), 1)
+    },
+    popperStyle() {
       return {
-        modifiers: [
-          {
-            name: 'flip',
-            enabled: false
-          },
-          {
-            name: 'preventOverflow',
-            options: {
-              mainAxis: true,
-              altAxis: false,
-              tether: false,
-              boundary: 'viewport',
-              padding: 16
-            }
-          }
-        ]
+        '--label-filter-max-width': `${this.popoverWidth}px`
       }
     },
-    filteredKeyOptions() {
-      return this.labelOptions
-    },
-    activeKeyOption() {
-      return this.labelOptions.find((option) => option.value === this.activeKey)
-    },
-    valueOptions() {
-      if (!this.activeKeyOption) {
-        return []
-      }
-      return [
+    popperOptions() {
+      const modifiers = [
         {
-          value: '*',
-          label: this.$t('LabelFilterAllValues')
+          name: 'flip',
+          enabled: false
         },
-        ...this.activeKeyOption.values
+        {
+          name: 'preventOverflow',
+          options: {
+            mainAxis: true,
+            altAxis: false,
+            tether: false,
+            boundary: this.boundaryElement || 'viewport',
+            padding: this.alignToBoundaryEnd
+              ? { top: 16, right: this.boundaryEndGap, bottom: 16, left: 16 }
+              : 16
+          }
+        }
       ]
-    },
-    filteredValueOptions() {
-      const query = this.valueQuery.trim().toLocaleLowerCase()
-      if (!query) {
-        return this.valueOptions
+      if (this.alignToBoundaryEnd) {
+        modifiers.push({
+          name: 'offset',
+          options: {
+            offset: [this.popoverBoundaryEndOffset, 12]
+          }
+        })
       }
-      return this.valueOptions.filter((option) => {
-        return option.label.toLocaleLowerCase().includes(query)
-      })
+      return {
+        modifiers
+      }
     }
   },
   watch: {
-    keyQuery() {
-      if (this.popoverVisible) {
-        this.debouncedSearchKeys()
-      }
-    },
     labelValue: {
       handler(newValue) {
         const selection = _.cloneDeep(newValue || [])
@@ -178,19 +204,53 @@ export default {
       deep: true
     }
   },
-  created() {
-    this.debouncedSearchKeys = _.debounce(() => {
-      this.getLabelOptions(this.keyQuery)
-    }, 300)
-  },
   mounted() {
     this.$eventBus.$on('labelSearch', this.labelSearchHandler)
   },
   beforeUnmount() {
-    this.debouncedSearchKeys?.cancel()
     this.$eventBus.$off('labelSearch', this.labelSearchHandler)
   },
   methods: {
+    decorateLabelValueOptions(options) {
+      return [
+        {
+          value: '*',
+          label: this.$t('LabelFilterAllValues')
+        },
+        ...options
+      ]
+    },
+    findBoundaryElement() {
+      if (!this.boundarySelector) {
+        return null
+      }
+      return [...document.querySelectorAll(this.boundarySelector)].find(
+        (element) => element.getBoundingClientRect().width > 0
+      )
+    },
+    preparePopoverBoundary() {
+      this.boundaryVersion += 1
+      const boundaryElement = this.findBoundaryElement()
+      const referenceElement = this.$el?.querySelector('.label-button')
+      if (!boundaryElement || !referenceElement) {
+        this.popoverAvailableWidth = null
+        this.popoverBoundaryEndOffset = 0
+        return
+      }
+      const boundaryRect = boundaryElement.getBoundingClientRect()
+      const referenceRect = referenceElement.getBoundingClientRect()
+      if (this.alignToBoundaryEnd) {
+        this.popoverAvailableWidth = boundaryRect.width - 16 - this.boundaryEndGap
+        this.popoverBoundaryEndOffset =
+          boundaryRect.right - referenceRect.right - this.boundaryEndGap
+        return
+      }
+      this.popoverBoundaryEndOffset = 0
+      const opensFromRight = this.placement.endsWith('-end')
+      this.popoverAvailableWidth = opensFromRight
+        ? referenceRect.right - boundaryRect.left - 16
+        : boundaryRect.right - referenceRect.left - 16
+    },
     getSelectionSnapshot() {
       return _.cloneDeep(this.labelValue)
     },
@@ -219,64 +279,8 @@ export default {
     handlePopoverVisibleChange(visible) {
       this.$emit('showLabelSearch', visible)
       if (!visible) {
-        this.debouncedSearchKeys?.cancel()
-        this.keyRequestId += 1
-        this.keyLoading = false
-        this.keyQuery = ''
-        this.valueQuery = ''
+        this.resetLabelSelectorSearch()
       }
-    },
-    normalizeListResponse(data) {
-      const results = Array.isArray(data) ? data : data?.results
-      return Array.isArray(results) ? results : []
-    },
-    async getLabelOptions(query = '') {
-      const requestId = ++this.keyRequestId
-      this.keyLoading = true
-      return this.$axios
-        .get('/api/v1/labels/labels/', {
-          params: {
-            limit: 200,
-            ...(query.trim() && { search: query.trim() })
-          }
-        })
-        .then((data) => {
-          if (requestId !== this.keyRequestId) {
-            return
-          }
-          const labels = this.normalizeListResponse(data).slice(0, 200)
-          const groupedLabels = _.groupBy(labels, 'name')
-          this.labelOptions = _.sortBy(
-            Object.entries(groupedLabels).map(([key, values]) => ({
-              value: key,
-              label: key,
-              values: _.uniqBy(
-                _.sortBy(
-                  values.map((label) => ({
-                    value: label.value,
-                    label: label.value
-                  })),
-                  'label'
-                ),
-                'value'
-              )
-            })),
-            'label'
-          )
-
-          if (!this.activeKey || !this.labelOptions.some((item) => item.value === this.activeKey)) {
-            this.activeKey = this.labelOptions[0]?.value || ''
-          }
-        })
-        .finally(() => {
-          if (requestId === this.keyRequestId) {
-            this.keyLoading = false
-          }
-        })
-    },
-    selectKey(key) {
-      this.activeKey = key
-      this.valueQuery = ''
     },
     selectValue(value) {
       this.addSelection(this.activeKey, value)
@@ -342,8 +346,10 @@ export default {
 </style>
 
 <style lang="scss">
+@use '../../labelSelector' as labelSelector;
+
 .label-filter-popper {
-  width: min(600px, calc(100vw - 32px)) !important;
+  width: min(var(--label-filter-max-width, 600px), calc(100vw - 32px)) !important;
   max-width: calc(100vw - 32px);
   padding: 0 !important;
   overflow: hidden;
@@ -377,25 +383,45 @@ export default {
 
     &__search {
       flex: 0 0 auto;
-      padding: 14px;
-      border-bottom: 1px solid var(--el-border-color-lighter);
-
-      .el-input__wrapper {
-        min-height: 32px;
-        border-radius: 3px;
-        box-shadow: 0 0 0 1px var(--el-border-color) inset !important;
-
-        &:hover,
-        &.is-focus {
-          box-shadow: 0 0 0 1px var(--el-border-color) inset !important;
-        }
-      }
+      @include labelSelector.search-input;
     }
 
     &__list {
       min-height: 0;
       padding: 6px;
       overflow: auto;
+      scrollbar-color: color-mix(in srgb, var(--el-text-color-secondary) 36%, transparent)
+        transparent;
+      scrollbar-width: thin;
+
+      &::-webkit-scrollbar {
+        -webkit-appearance: none;
+        width: 6px;
+        height: 6px;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      &::-webkit-scrollbar-track,
+      &::-webkit-scrollbar-track-piece,
+      &::-webkit-scrollbar-corner {
+        -webkit-appearance: none;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      &::-webkit-scrollbar-thumb {
+        border: 0;
+        border-radius: 999px;
+        background-color: color-mix(in srgb, var(--el-text-color-secondary) 36%, transparent);
+        box-shadow: none;
+      }
+
+      &:hover::-webkit-scrollbar-thumb {
+        background-color: color-mix(in srgb, var(--el-text-color-secondary) 48%, transparent);
+      }
     }
 
     &__option {
@@ -440,6 +466,18 @@ export default {
 
       .el-icon {
         flex: 0 0 auto;
+      }
+    }
+
+    &__value {
+      gap: 10px;
+      @include labelSelector.value-color-swatch;
+
+      .el-checkbox {
+        flex: 0 0 auto;
+        height: auto;
+        margin-right: 0;
+        pointer-events: none;
       }
     }
 

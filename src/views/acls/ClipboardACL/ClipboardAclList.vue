@@ -9,7 +9,7 @@
 <script>
 import { GenericListPage } from '@/layout/components'
 import { createVNode, resolveComponent } from 'vue'
-import { filterClipboardOperations, getClipboardOperationOptions } from './const'
+import { filterClipboardOperations } from './const'
 
 export default {
   name: 'ClipboardAclList',
@@ -21,6 +21,10 @@ export default {
       helpMsg: this.$t('ClipboardACLHelpMsg'),
       tableConfig: {
         url: '/api/v1/acls/clipboard-acls/',
+        permissions: {
+          app: 'acls',
+          resource: 'clipboardacl'
+        },
         columnsExclude: [
           'users',
           'assets',
@@ -43,7 +47,7 @@ export default {
           },
           operations: {
             formatter: (row) => {
-              const operations = filterClipboardOperations(row.operations)
+              const operations = filterClipboardOperations(row.operations, this)
               return createVNode(
                 'div',
                 {
@@ -67,6 +71,8 @@ export default {
           },
           actions: {
             formatterArgs: {
+              canUpdate: () => this.$hasPerm('acls.change_clipboardacl'),
+              canClone: () => this.$hasPerm('acls.add_clipboardacl'),
               updateRoute: 'ClipboardACLUpdate',
               cloneRoute: 'ClipboardACLCreate'
             }
@@ -76,17 +82,6 @@ export default {
       updateRoute: 'ClipboardACLUpdate',
       headerActions: {
         createRoute: 'ClipboardACLCreate',
-        searchConfig: {
-          exclude: ['operations'],
-          options: [
-            {
-              label: this.$t('Operations'),
-              type: 'choice',
-              value: 'operations',
-              children: getClipboardOperationOptions(this)
-            }
-          ]
-        },
         hasRefresh: true,
         hasExport: false,
         hasImport: false

@@ -6,7 +6,7 @@
     @url-change="handleTreeUrlChange"
   >
     <template #table>
-      <AccountListTable v-bind="tableConfig" ref="table" />
+      <AccountListTable v-bind="tableConfig" ref="table" activation-refresh="never" />
     </template>
   </AssetTreeTable>
 </template>

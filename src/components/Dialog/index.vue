@@ -10,6 +10,10 @@
     :width="iWidth"
     @update:model-value="handleVisibleChange"
   >
+    <template v-if="$slots.header" #header="headerProps">
+      <slot name="header" v-bind="headerProps" />
+    </template>
+
     <div v-loading="disabledStatus">
       <slot />
     </div>
@@ -23,7 +27,7 @@
           <el-button
             v-if="showConfirm && showButtons"
             :disabled="disabledStatus"
-            type="primary"
+            :type="confirmType"
             @click="onConfirm"
           >
             {{ $t(confirmTitle) }}
@@ -64,6 +68,10 @@ export default {
       default() {
         return 'Confirm'
       }
+    },
+    confirmType: {
+      type: String,
+      default: 'primary'
     },
     showCancel: {
       type: Boolean,
@@ -166,8 +174,6 @@ export default {
   }
 
   .el-dialog__title {
-    font-size: 18px;
-    font-weight: 400;
     color: var(--color-text-primary);
   }
 
@@ -196,7 +202,7 @@ export default {
   }
 
   .el-dialog__body {
-    padding: 20px 30px !important;
+    padding: 30px;
     font-size: 13px;
   }
 
@@ -216,12 +222,7 @@ export default {
   }
 }
 
-.dialog-fade-enter-active,
 .dialog-fade-leave-active {
-  transition: opacity 1s ease;
-}
-
-.dialog-fade-enter, .dialog-fade-leave-to /* .dialog-fade-leave-active 在 <2.1.8 中以及被重复声明 */ {
-  opacity: 0;
+  pointer-events: none;
 }
 </style>

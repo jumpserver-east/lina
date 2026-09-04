@@ -30,6 +30,7 @@
       v-model:visible="dialogVisible"
       :base-node-url="baseNodeUrl"
       :base-url="baseUrl"
+      :page-size="defaultPageSize"
       :tree-setting="treeSetting"
       :tree-url-query="treeUrlQuery"
       :value="selectedValue"
@@ -244,6 +245,11 @@ export default {
     },
     getSelectedValue() {
       return _.cloneDeep(this.selectedValue)
+    },
+    clearSelected() {
+      this.selectedValue = []
+      this.selectedRows = []
+      this.emitValue([])
     }
   }
 }

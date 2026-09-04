@@ -2,46 +2,89 @@
   <Dialog
     :before-close="handleBeforeDialogClose"
     :close-on-click-modal="false"
-    :title="$t('ResourceSelectDialogTitle', { resource: displayResourceName })"
+    :title="dialogTitle"
     :visible="visible"
     class="resource-select-dialog"
-    max-width="1200px"
-    top="3vh"
-    width="88vw"
+    max-width="880px"
+    top="6vh"
+    width="880px"
     @cancel="handleCancel"
     @confirm="handleConfirm"
     @update:visible="handleVisibleChange"
   >
-    <el-tabs
-      v-model="activeTab"
-      :before-leave="handleBeforeTabLeave"
-      class="resource-select-dialog__tabs"
-    >
-      <el-tab-pane name="available">
-        <template #label>
-          {{ $t('ResourceSelectUnselectedResources') }}
-          <span v-if="availableCount !== null">({{ availableCount }})</span>
-        </template>
+    <template #header="{ titleId, titleClass }">
+      <div class="resource-select-dialog__header-content">
+        <div :id="titleId" :class="[titleClass, 'resource-select-dialog__title']">
+          {{ dialogTitle }}
+        </div>
+        <div :aria-label="dialogTitle" class="resource-select-dialog__tabs" role="tablist">
+          <button
+            :aria-selected="activeTab === 'selected'"
+            :class="{ 'is-active': activeTab === 'selected' }"
+            :tabindex="activeTab === 'selected' ? 0 : -1"
+            class="resource-select-dialog__tab"
+            role="tab"
+            type="button"
+            @click="selectDialogTab('selected')"
+            @keydown.right.prevent="selectDialogTab('available')"
+          >
+            <span class="resource-select-dialog__tab-label">
+              <span>{{
+                $t('ResourceSelectSelectedResources', {
+                  resource: displayResourceName
+                })
+              }}</span>
+              <span class="resource-select-dialog__tab-count">({{ selectedCount }})</span>
+            </span>
+          </button>
+          <button
+            :aria-selected="activeTab === 'available'"
+            :class="{ 'is-active': activeTab === 'available' }"
+            :tabindex="activeTab === 'available' ? 0 : -1"
+            class="resource-select-dialog__tab"
+            role="tab"
+            type="button"
+            @click="selectDialogTab('available')"
+            @keydown.left.prevent="selectDialogTab('selected')"
+          >
+            <span class="resource-select-dialog__tab-label">
+              <span>{{
+                $t('ResourceSelectUnselectedResources', {
+                  resource: displayResourceName
+                })
+              }}</span>
+              <span v-if="availableCount !== null" class="resource-select-dialog__tab-count">
+                ({{ availableCount }})
+              </span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <div class="resource-select-dialog__content">
+      <div v-show="activeTab === 'available'" class="resource-select-dialog__panel">
         <ListTable
           ref="availableTable"
+          fill-height
           :header-actions="availableHeaderActions"
           :table-config="availableTableConfig"
-          @selection-change="availableChecked = $event"
+          :table-metadata-provider="getSharedTableMetadata"
+          @selection-change="handleAvailableSelectionChange"
         />
-      </el-tab-pane>
+      </div>
 
-      <el-tab-pane name="selected">
-        <template #label>
-          {{ $t('ResourceSelectSelectedResources') }} ({{ selectedCount }})
-        </template>
+      <div v-show="activeTab === 'selected'" class="resource-select-dialog__panel">
         <ListTable
           ref="selectedTable"
+          fill-height
           :header-actions="selectedHeaderActions"
           :table-config="selectedTableConfig"
-          @selection-change="selectedChecked = $event"
+          :table-metadata-provider="getSharedTableMetadata"
+          @selection-change="handleSelectedSelectionChange"
         />
-      </el-tab-pane>
-    </el-tabs>
+      </div>
+    </div>
   </Dialog>
 </template>
 
@@ -69,6 +112,10 @@ export default {
       default: false
     },
     value: {
+      type: Array,
+      default: () => []
+    },
+    selectedResources: {
       type: Array,
       default: () => []
     },
@@ -114,11 +161,19 @@ export default {
     },
     pageSize: {
       type: Number,
-      default: 15
+      default: 10
     }
   },
   emits: ['cancel', 'confirm', 'update:visible'],
   data() {
+    const resourceCache = new Map()
+    this.selectedResources.forEach((item) => {
+      const id = item?.[this.valueKey] ?? item?.value ?? item?.id
+      const name = String(item?.name || '').trim()
+      if (id !== undefined && id !== null && id !== '' && name) {
+        resourceCache.set(String(id), { value: id, name })
+      }
+    })
     return {
       activeTab: this.initialTab,
       draftValue: [...this.value],
@@ -136,6 +191,9 @@ export default {
       selectionSpmPromiseVersion: -1,
       availableRequestQueue: Promise.resolve(),
       selectedRequestQueue: Promise.resolve(),
+      resourceCache,
+      tableMetadataRequestUrl: '',
+      tableMetadataRequest: null,
       sharedNodeTreeState: {
         asset: {
           data: [],
@@ -166,6 +224,13 @@ export default {
         hasExport: false,
         hasRefresh: false,
         hasLabelSearch: true,
+        labelSearchConfig: {
+          alignToBoundaryEnd: true,
+          boundaryEndGap: 5,
+          boundarySelector: '.resource-select-dialog.el-dialog',
+          maxWidth: 640,
+          placement: 'bottom-end'
+        },
         hasNodeSearch: Boolean(this.nodeFilter),
         nodeSearchConfig: {
           ...(typeof this.nodeFilter === 'object' ? this.nodeFilter : {}),
@@ -185,10 +250,9 @@ export default {
             title: this.$t('ResourceSelectAddSelected', {
               count: this.availableChecked.length
             }),
-            icon: 'plus',
             type: 'primary',
-            can: ({ selectedRows }) => selectedRows.length > 0,
-            callback: ({ selectedRows }) => this.addResources(selectedRows)
+            can: () => this.availableChecked.length > 0,
+            callback: () => this.addResources(this.availableChecked)
           }
         ]
       }
@@ -202,23 +266,31 @@ export default {
             title: this.$t('ResourceSelectRemoveSelected', {
               count: this.selectedChecked.length
             }),
-            icon: 'fa-minus-square-o',
             type: 'danger',
-            can: ({ selectedRows }) => selectedRows.length > 0,
-            callback: ({ selectedRows }) => this.removeResources(selectedRows)
+            can: () => this.selectedChecked.length > 0,
+            callback: () => this.removeResources(this.selectedChecked)
           },
           {
-            name: 'clearSelectedResources',
-            title: this.$t('ResourceSelectRemoveAll'),
-            icon: 'trash',
-            can: () => this.selectedCount > 0,
-            callback: () => this.clearSelected()
+            name: 'resourceSelectMoreActions',
+            title: this.$t('MoreActions'),
+            dropdown: [
+              {
+                name: 'clearSelectedResources',
+                title: this.$t('ResourceSelectRemoveAll'),
+                icon: 'fa-square-minus',
+                can: () => this.selectedCount > 0,
+                callback: () => this.clearSelected()
+              }
+            ]
           }
         ]
       }
     },
     displayResourceName() {
-      return this.resourceName || this.$t('Resources')
+      return this.resourceName || ''
+    },
+    dialogTitle() {
+      return this.$t('ResourceSelectDialogTitle', { resource: this.displayResourceName })
     },
     selectedCount() {
       return this.draftValue.length
@@ -229,13 +301,29 @@ export default {
     effectivePageSize() {
       return Math.min(Math.max(this.pageSize, 1), 100)
     },
+    tableUrl() {
+      const url = new URL(this.url, location.origin)
+      url.searchParams.set('fields_size', 'small')
+      return `${url.pathname}${url.search}${url.hash}`
+    },
     defaultColumns() {
+      let columns
       if (Array.isArray(this.columnsShow.default)) {
-        return this.columnsShow.default
+        columns = this.columnsShow.default
+      } else {
+        const urlPathname = new URL(this.url, location.origin).pathname
+        const pathname = urlPathname.endsWith('/') ? urlPathname : `${urlPathname}/`
+        columns = defaultColumnsByResource[pathname] || genericDefaultColumns
       }
-      const urlPathname = new URL(this.url, location.origin).pathname
-      const pathname = urlPathname.endsWith('/') ? urlPathname : `${urlPathname}/`
-      return defaultColumnsByResource[pathname] || genericDefaultColumns
+      const filteredColumns = columns.filter((column) => {
+        const name = typeof column === 'object' ? column?.prop : column
+        return name !== 'id' && name !== 'actions'
+      })
+      return [...(filteredColumns.length > 0 ? filteredColumns : ['name']), 'actions']
+    },
+    minimumColumns() {
+      const configured = Array.isArray(this.columnsShow.min) ? this.columnsShow.min : []
+      return [...new Set(['name', 'actions', ...configured])].filter((column) => column !== 'id')
     },
     tableName() {
       const pathname = new URL(this.url, location.origin).pathname.replaceAll('/', '_')
@@ -245,18 +333,24 @@ export default {
     },
     commonTableConfig() {
       return {
-        url: this.url,
+        url: this.tableUrl,
         id: this.valueKey,
-        ...(this.columns.length > 0 ? { columns: this.columns } : {}),
+        savePageSize: false,
         paginationSize: this.effectivePageSize,
-        paginationSizes: [...new Set([this.effectivePageSize, 30, 50, 100])]
+        paginationSizes: [...new Set([10, 15, this.effectivePageSize, 30, 50, 100])]
           .filter((size) => size <= 100)
           .sort((a, b) => a - b),
         persistSelection: false,
         saveQuery: false,
+        tableAttrs: {
+          size: 'small'
+        },
+        actionsColumnPosition: 'start',
+        selectionFixed: 'left',
+        selectionWidth: 40,
         columnsShow: {
-          min: ['name', 'actions'],
           ...this.columnsShow,
+          min: this.minimumColumns,
           default: this.defaultColumns
         },
         columnsMeta: {
@@ -274,11 +368,17 @@ export default {
         ...this.commonTableConfig,
         name: `${this.tableName}Resources`,
         canSelect: this.canSelect,
-        request: this.requestAvailablePage,
         columnsMeta: {
           ...this.commonTableConfig.columnsMeta,
           actions: {
+            className: 'resource-select-action-column',
+            fitWidth: false,
+            fixed: 'left',
+            hideHeaderLabel: true,
+            width: '60px',
             formatterArgs: {
+              compact: true,
+              squareButtons: true,
               hasUpdate: false,
               hasDelete: false,
               hasClone: false,
@@ -286,25 +386,33 @@ export default {
                 {
                   name: 'add',
                   title: this.$t('Add'),
-                  icon: 'fa-plus',
+                  icon: 'fa-solid fa-plus',
+                  showTip: false,
                   can: ({ row }) => this.canSelect(row),
                   callback: ({ row }) => this.addResources([row])
                 }
               ]
             }
           }
-        }
+        },
+        request: this.requestAvailablePage
       }
     },
     selectedTableConfig() {
       return {
         ...this.commonTableConfig,
         name: `${this.tableName}Resources`,
-        request: this.requestSelectedPage,
         columnsMeta: {
           ...this.commonTableConfig.columnsMeta,
           actions: {
+            className: 'resource-select-action-column',
+            fitWidth: false,
+            fixed: 'left',
+            hideHeaderLabel: true,
+            width: '60px',
             formatterArgs: {
+              compact: true,
+              squareButtons: true,
               hasUpdate: false,
               hasDelete: false,
               hasClone: false,
@@ -312,13 +420,17 @@ export default {
                 {
                   name: 'remove',
                   title: this.$t('Remove'),
-                  type: 'danger',
+                  icon: 'fa-solid fa-minus',
+                  iconStyle: { transform: 'scaleX(0.78) scaleY(1.25)' },
+                  showTip: false,
+                  hoverType: 'danger',
                   callback: ({ row }) => this.removeResources([row])
                 }
               ]
             }
           }
-        }
+        },
+        request: this.requestSelectedPage
       }
     }
   },
@@ -333,17 +445,11 @@ export default {
         const tableRef = value === 'selected' ? 'selectedTable' : 'availableTable'
         const pageSizeSynced = this.syncTablePageSize(tableRef)
         const columnsSynced = this.syncTableColumns(tableRef)
-        if (pageSizeSynced && !columnsSynced) {
+        const dataDirty = value === 'selected' ? this.selectedDirty : this.availableDirty
+        if (dataDirty) {
+          this.$refs[tableRef]?.reloadTable()
+        } else if (pageSizeSynced && !columnsSynced) {
           this.$refs[tableRef]?.dataTable?.dataTable?.getList()
-        }
-        const tableSynced = pageSizeSynced || columnsSynced
-        if (value === 'selected' && this.selectedDirty && !tableSynced) {
-          this.$refs.selectedTable?.reloadTable()
-          this.selectedDirty = false
-        }
-        if (value === 'available' && this.availableDirty && !tableSynced) {
-          this.$refs.availableTable?.reloadTable()
-          this.availableDirty = false
         }
         if (value === 'selected') {
           this.selectedDirty = false
@@ -360,6 +466,41 @@ export default {
     document.removeEventListener('keydown', this.handleDialogShortcut)
   },
   methods: {
+    cacheResources(resources) {
+      resources.forEach((item) => {
+        const id = item?.[this.valueKey] ?? item?.value ?? item?.id
+        const name = String(item?.name || '').trim()
+        if (id !== undefined && id !== null && id !== '' && name) {
+          this.resourceCache.set(String(id), { value: id, name })
+        }
+      })
+    },
+    getSelectedResources() {
+      return this.draftValue.map((id) => this.resourceCache.get(String(id))).filter(Boolean)
+    },
+    getSharedTableMetadata(url) {
+      if (this.tableMetadataRequest && this.tableMetadataRequestUrl === url) {
+        return this.tableMetadataRequest
+      }
+
+      this.tableMetadataRequestUrl = url
+      const request = this.$store.dispatch('common/getUrlMeta', { url })
+      const sharedRequest = request.catch((error) => {
+        if (this.tableMetadataRequest === sharedRequest) {
+          this.tableMetadataRequest = null
+          this.tableMetadataRequestUrl = ''
+        }
+        throw error
+      })
+      this.tableMetadataRequest = sharedRequest
+      return sharedRequest
+    },
+    handleAvailableSelectionChange(rows) {
+      this.availableChecked = rows
+    },
+    handleSelectedSelectionChange(rows) {
+      this.selectedChecked = rows
+    },
     handleDialogShortcut(event) {
       if (
         event.defaultPrevented ||
@@ -406,6 +547,16 @@ export default {
       await this.$refs[currentTable]?.closeNodeSearch()
       return true
     },
+    async selectDialogTab(nextTab) {
+      const currentTab = this.activeTab
+      if (nextTab === currentTab) {
+        return
+      }
+      const canLeave = await this.handleBeforeTabLeave(nextTab, currentTab)
+      if (canLeave !== false) {
+        this.activeTab = nextTab
+      }
+    },
     syncTablePageSize(refName) {
       const table = this.$refs[refName]?.dataTable?.dataTable
       if (!table || table.size === this.sharedPageSize) {
@@ -435,7 +586,9 @@ export default {
     },
     getQueryParams() {
       const params = typeof this.queryParams === 'function' ? this.queryParams() : this.queryParams
-      return { ...(params || {}) }
+      const normalizedParams = { ...(params || {}) }
+      delete normalizedParams.fields_size
+      return normalizedParams
     },
     normalizeResponse(response) {
       if (Array.isArray(response)) {
@@ -460,7 +613,7 @@ export default {
       }
     },
     createTablePageRequest(table, page = table.page) {
-      const request = this.parseTableRequest(this.url, table.axiosConfig)
+      const request = this.parseTableRequest(this.tableUrl, table.axiosConfig)
       const limit = table.size || this.effectivePageSize
       const offset = Math.max((page - table.firstPage) * limit, 0)
       return {
@@ -478,10 +631,13 @@ export default {
         params: {
           ...this.getQueryParams(),
           ...request.params,
-          ...selectionParams
+          ...selectionParams,
+          fields_size: 'small'
         }
       })
-      return this.normalizeResponse(response)
+      const data = this.normalizeResponse(response)
+      this.cacheResources(data.results)
+      return data
     },
     requestAvailablePage(requestUrl, axiosConfig) {
       const selectionVersion = this.selectionVersion
@@ -654,6 +810,7 @@ export default {
       table.clearSelection()
     },
     addResources(rows) {
+      this.cacheResources(rows)
       const addedIds = []
       rows
         .filter((row) => this.canSelect(row))
@@ -676,7 +833,13 @@ export default {
       this.selectedDirty = true
     },
     removeResources(rows) {
-      const removedIds = new Set(rows.map((row) => row[this.valueKey]))
+      const selectedIds = this.selectedIdSet
+      const removedIds = new Set(
+        rows.map((row) => row[this.valueKey]).filter((id) => selectedIds.has(id))
+      )
+      if (removedIds.size === 0) {
+        return
+      }
       this.draftValue = this.draftValue.filter((id) => !removedIds.has(id))
       this.invalidateSelectionCache()
       if (this.availableCount !== null) {
@@ -712,7 +875,45 @@ export default {
     },
     async handleConfirm() {
       await this.closeNodeSearchPopovers()
-      this.$emit('confirm', [...this.draftValue])
+      const pendingAdditions = this.availableChecked.filter(
+        (row) => this.canSelect(row) && !this.selectedIdSet.has(row[this.valueKey])
+      )
+      const pendingRemovals = this.selectedChecked.filter((row) =>
+        this.selectedIdSet.has(row[this.valueKey])
+      )
+
+      if (pendingAdditions.length > 0 || pendingRemovals.length > 0) {
+        let message
+        if (pendingAdditions.length > 0 && pendingRemovals.length > 0) {
+          message = this.$t('ResourceSelectPendingChangesConfirm', {
+            addCount: pendingAdditions.length,
+            removeCount: pendingRemovals.length
+          })
+        } else if (pendingAdditions.length > 0) {
+          message = this.$t('ResourceSelectPendingAddConfirm', {
+            count: pendingAdditions.length
+          })
+        } else {
+          message = this.$t('ResourceSelectPendingRemoveConfirm', {
+            count: pendingRemovals.length
+          })
+        }
+
+        try {
+          await this.$confirm(message, this.$t('Confirm'), {
+            type: 'warning',
+            confirmButtonText: this.$t('Confirm'),
+            cancelButtonText: this.$t('Cancel')
+          })
+        } catch (_) {
+          return
+        }
+
+        this.addResources(pendingAdditions)
+        this.removeResources(pendingRemovals)
+      }
+
+      this.$emit('confirm', [...this.draftValue], this.getSelectedResources())
       this.$emit('update:visible', false)
     },
     async handleCancel() {
@@ -726,18 +927,194 @@ export default {
 
 <style lang="scss">
 .resource-select-dialog.el-dialog {
-  height: min(820px, 86vh);
+  --resource-select-dialog-max-height: min(620px, 88vh);
+  --resource-select-dialog-body-background: var(--el-fill-color-lighter, #fafafa);
+  --tab-page-header-height: 40px;
+  --tab-page-navigation-background-color: var(--page-background-color, #fff);
+
+  height: var(--resource-select-dialog-max-height);
+  max-height: var(--resource-select-dialog-max-height);
   display: flex;
   flex-direction: column;
+
+  .el-dialog__header {
+    flex: 0 0 auto;
+    padding: 8px 24px 0 !important;
+    border-bottom: 1px solid var(--panel-border-color, var(--el-border-color));
+  }
 
   .el-dialog__body {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    padding: 8px 24px 10px !important;
+    overflow: hidden;
+    background: var(--resource-select-dialog-body-background);
   }
 
-  .el-dialog__body > .el-loading-parent--relative {
-    min-height: 100%;
+  .el-dialog__footer {
+    flex: 0 0 auto;
+    padding: 10px 24px !important;
+    border-top: 1px solid var(--panel-border-color, var(--el-border-color));
+  }
+
+  .el-dialog__body > div {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .resource-select-dialog__header-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 12px;
+  }
+
+  .resource-select-dialog__tabs {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    height: var(--tab-page-header-height);
+    gap: 0;
+    background-color: var(--tab-page-navigation-background-color);
+  }
+
+  .resource-select-dialog__tab {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    height: var(--tab-page-header-height);
+    padding: 0 18px;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    background-color: var(--tab-page-navigation-background-color);
+    color: var(--el-text-color-regular, #606266);
+    cursor: pointer;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1;
+    user-select: none;
+    white-space: nowrap;
+    transition:
+      color 120ms ease,
+      background-color 120ms ease;
+
+    &:first-child {
+      padding-left: 0;
+    }
+
+    &.is-active {
+      color: var(--el-color-primary);
+      background-color: var(--tab-page-navigation-background-color);
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    &:not(.is-active):hover {
+      color: var(--el-text-color-regular, #606266);
+      background-color: var(--tab-page-navigation-background-color);
+    }
+
+    &:focus,
+    &:focus:active,
+    &:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+  }
+
+  .resource-select-dialog__tab-label {
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    gap: 4px;
+  }
+
+  .resource-select-dialog__tab-count {
+    color: inherit;
+    font-size: inherit;
+    opacity: 0.62;
+  }
+
+  .resource-select-dialog__content,
+  .resource-select-dialog__panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    background: var(--resource-select-dialog-body-background);
+  }
+
+  .list-table {
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    gap: 8px;
+    background: var(--resource-select-dialog-body-background);
+  }
+
+  .table-content {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .table-content > .el-card,
+  .table-content > .el-card > .el-card__body,
+  .auto-data-table,
+  .auto-data-table > .auto-data-table__content,
+  .auto-data-table .el-data-table {
+    height: 100%;
+    min-height: 0;
+    background: var(--resource-select-dialog-body-background);
+  }
+
+  .table-content > .el-card {
+    border: 0;
+  }
+
+  .auto-data-table .el-data-table > .el-data-table__surface {
+    // Header, tabs, toolbar, dialog padding and footer use 171px in total.
+    // Keep the table inside the dialog's fixed-height content area.
+    max-height: calc(var(--resource-select-dialog-max-height) - 171px);
+  }
+
+  .el-dialog__body .table-action .table-action__toolbar .search {
+    gap: 8px;
+
+    &.has-label-filter .search-primary {
+      margin-left: 0;
+    }
+  }
+
+  .resource-select-action-column {
+    border-right-color: transparent !important;
+  }
+
+  .el-data-table__body > .el-table--border {
+    --el-table-border-color: var(--panel-border-color, var(--el-border-color));
+
+    &::before,
+    &::after {
+      display: none;
+    }
+
+    > .el-table__inner-wrapper > .el-table__border-left-patch,
+    > .el-table__inner-wrapper > .el-table__border-right-patch,
+    > .el-table__inner-wrapper > .el-table__border-bottom-patch {
+      display: none;
+    }
+
+    tr > .el-table__cell:last-child {
+      border-right: 0 !important;
+    }
   }
 }
 </style>

@@ -2,18 +2,22 @@
   <TreeTable
     v-bind="$attrs"
     ref="TreeList"
-    v-model:active-menu="treeTableConfig.activeMenu"
+    v-model:active-menu="treeTabConfig.activeMenu"
     :component="treeComponent"
     :table-config="tableConfig"
-    :tree-tab-config="treeTableConfig"
+    :tree-tab-config="visibleTreeTabConfig"
+    :tree-initial-max-width="treeInitialMaxWidth"
     :tree-width="treeWidth"
   >
-    <template #table>
+    <template v-if="$slots.table" #table>
       <slot name="table" />
     </template>
-    <template #rMenu="{ data }">
+    <template v-if="$slots['search-after']" #search-after>
+      <slot name="search-after" />
+    </template>
+    <template #rMenu="slotProps">
       <div>
-        <slot :data="data" name="rMenu" />
+        <slot name="rMenu" v-bind="slotProps" />
       </div>
     </template>
   </TreeTable>
@@ -21,8 +25,8 @@
 
 <script>
 import TreeTable from '../../Table/TreeTable/index.vue'
+import { createXTreeSetting } from '@/components/Tree/XTree/config'
 import { getShowCurrentAssetValue, setRouterQuery, setUrlParam } from '@/utils/common/index'
-import $ from '@/utils/jquery-vendor'
 
 export default {
   components: {
@@ -45,6 +49,10 @@ export default {
       type: String,
       default: '/api/v1/assets/nodes/children/tree/'
     },
+    treeAmountUrl: {
+      type: String,
+      default: '/api/v1/assets/nodes/assets-amount/'
+    },
     treeUrlQuery: {
       type: Object,
       default: () => ({})
@@ -53,6 +61,10 @@ export default {
       type: Object,
       default: () => ({})
     },
+    additionalTreeViews: {
+      type: Array,
+      default: () => []
+    },
     tableConfig: {
       type: Object,
       default: () => ({})
@@ -60,27 +72,53 @@ export default {
     showAssets: {
       type: Boolean,
       default: false
+    },
+    treeWidth: {
+      type: String,
+      default: '20%'
+    },
+    treeInitialMaxWidth: {
+      type: Number,
+      default: 320
     }
   },
   data() {
     const showAssets = this.treeSetting?.showAssets || this.showAssets
     const treeUrlQuery = this.setTreeUrlQuery()
     const assetTreeUrl = `${this.treeUrl}?assets=${showAssets ? '1' : '0'}&${treeUrlQuery}`
-    const vm = this
-
+    const assetTreeLazyUrl = setUrlParam(assetTreeUrl, 'asset_amount', '0')
+    const isAssetNodeTree = this.treeUrl.includes('/api/v1/assets/nodes/')
+    let assetTreeStructureUrl = showAssets
+      ? assetTreeLazyUrl
+      : setUrlParam(assetTreeLazyUrl, 'all', 'all')
+    if (!showAssets && isAssetNodeTree) {
+      assetTreeStructureUrl = setUrlParam(assetTreeStructureUrl, 'compact', '1')
+    }
+    const assetTreeAmountUrl = isAssetNodeTree ? this.treeAmountUrl : ''
     return {
       treeComponent: 'TabTree',
       treeTabConfig: {
         activeMenu: 'CustomTree',
+        treeComponent: 'XTree',
         submenu: [
           {
-            title: this.$t('AssetTree'),
+            title:
+              this.treeSetting?.treeTitle ||
+              (this.treeSetting?.treeComponent === 'NodeAssetTree'
+                ? this.$t('NodeAssetTree')
+                : this.$t('NodeTree')),
             name: 'CustomTree',
-            icon: 'fa-tree',
-            treeSetting: {
+            icon:
+              this.treeSetting?.treeIcon ||
+              (this.treeSetting?.treeComponent === 'NodeAssetTree'
+                ? 'fa-solid fa-desktop'
+                : 'fa-solid fa-diagram-project'),
+            treeComponent: this.treeSetting?.treeComponent || 'XTree',
+            treeSetting: createXTreeSetting({
               showAssets,
               showMenu: false,
               showRefresh: true,
+              showCollapse: this.treeSetting?.showCollapse !== false,
               showCreate: true,
               showUpdate: true,
               showDelete: true,
@@ -88,27 +126,36 @@ export default {
               showSearch: true,
               url: this.url,
               nodeUrl: this.nodeUrl,
-              treeUrl: assetTreeUrl,
+              treeUrl: assetTreeLazyUrl,
+              structureUrl: assetTreeStructureUrl,
+              countUrl: assetTreeAmountUrl,
+              lazyLoad: showAssets,
               callback: {
-                onSelected: (event, treeNode) => this.getAssetsUrl(treeNode),
+                onSelected: (event, treeNode, context) =>
+                  this.getAssetsUrl(treeNode, context?.assetScope),
                 beforeRefresh: () => {
-                  const query = { ...vm.$route.query, node_id: '', asset_id: '' }
+                  const query = { ...this.$route.query, node_id: '', asset_id: '' }
                   setTimeout(() => {
-                    setRouterQuery(vm, `?${new URLSearchParams(query)}`, { browserOnly: true })
+                    setRouterQuery(this, `?${new URLSearchParams(query)}`, {
+                      browserOnly: true
+                    })
                   }, 100)
                 }
               },
               ...this.treeSetting
-            }
+            })
           },
           {
             title: this.$t('TypeTree'),
-            icon: 'fa-list-ul',
+            icon: 'fa-solid fa-shapes',
             name: 'BuiltinTree',
-            treeSetting: {
+            treeComponent: 'XTree',
+            treeSetting: createXTreeSetting({
               showRefresh: true,
+              showCollapse: true,
               showAssets: false,
-              showSearch: false,
+              showSearch: true,
+              lazyLoad: false,
               customTreeHeaderName: this.$t('TypeTree'),
               url: this.typeUrl,
               nodeUrl: this.treeSetting?.nodeUrl || this.nodeUrl,
@@ -121,26 +168,29 @@ export default {
                   isMove: false
                 }
               }
-            }
-          }
+            })
+          },
+          ...this.additionalTreeViews.map((item) => ({
+            ...item,
+            treeComponent: item.treeComponent || 'XTree',
+            treeSetting: createXTreeSetting(item.treeSetting || {})
+          }))
         ]
       }
     }
   },
   computed: {
-    treeWidth() {
-      return '23.6%'
-    },
-    treeTableConfig() {
-      if (this.treeSetting.notShowBuiltinTree) {
-        // eslint-disable-next-line vue/no-side-effects-in-computed-properties
-        this.treeTabConfig.submenu.splice(1, 1)
+    visibleTreeTabConfig() {
+      if (!this.treeSetting.notShowBuiltinTree) {
+        return this.treeTabConfig
       }
-      return this.treeTabConfig
+      return {
+        ...this.treeTabConfig,
+        submenu: this.treeTabConfig.submenu.filter((item) => item.name !== 'BuiltinTree')
+      }
     }
   },
   mounted() {
-    this.decorateRMenu()
     const treeSetting = this.treeTabConfig.submenu[0].treeSetting
     treeSetting.hasRightMenu = !this.currentOrgIsRoot
     treeSetting.showCreate = this.$hasPerm('assets.add_node')
@@ -151,24 +201,28 @@ export default {
     reloadTable() {
       this.$refs.TreeList.reloadTable()
     },
-    setTreeUrlQuery() {
-      let str = ''
-      for (const key in this.treeUrlQuery) {
-        str += `${key}=${this.treeUrlQuery[key]}&`
-      }
-      str = str.substr(0, str.length - 1)
-
-      return str
+    getTreeSnapshot() {
+      return this.$refs.TreeList?.getTreeSnapshot?.()
     },
-    decorateRMenu() {
-      const show_current_asset = getShowCurrentAssetValue(this.$cookie)
-      if (show_current_asset === '1') {
-        $('#m_show_asset_all_children_node').css('color', '#606266')
-        $('#m_show_asset_only_current_node').css('color', 'green')
-      } else {
-        $('#m_show_asset_all_children_node').css('color', 'green')
-        $('#m_show_asset_only_current_node').css('color', '#606266')
-      }
+    getSelectedNodes() {
+      return this.$refs.TreeList?.getSelectedNodes?.() || []
+    },
+    reloadVisibleTreeMetrics(options) {
+      return this.$refs.TreeList?.reloadVisibleMetrics?.(options)
+    },
+    invalidateNormalMetrics() {
+      return this.$refs.TreeList?.invalidateNormalMetrics?.()
+    },
+    setPermissionScope(scope) {
+      return this.$refs.TreeList?.setPermissionScope?.(scope)
+    },
+    toggleRowSelection(row, isSelected) {
+      return this.$refs.TreeList?.toggleRowSelection(row, isSelected)
+    },
+    setTreeUrlQuery() {
+      return Object.entries(this.treeUrlQuery)
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&')
     },
     updateTableUrl(url) {
       const treeList = this.$refs.TreeList
@@ -185,26 +239,27 @@ export default {
       return url
     },
 
-    getAssetsUrl(treeNode) {
+    getAssetsUrl(treeNode, selectedAssetScope) {
       let url = this.treeSetting?.url || this.url
-      const showCurrentAsset = getShowCurrentAssetValue(this.$cookie)
+      const showCurrentAsset = selectedAssetScope ?? getShowCurrentAssetValue(this.$cookie)
+      const nodeType = treeNode.meta?.type
 
-      if (treeNode.meta.type === 'node') {
+      if (nodeType === 'node') {
         const nodeId = treeNode.meta.data.id
         url = setUrlParam(url, 'node_id', nodeId)
         url = setUrlParam(url, 'asset_id', '')
         url = setUrlParam(url, 'show_current_asset', showCurrentAsset)
-      } else if (treeNode.meta.type === 'asset') {
+      } else if (nodeType === 'asset') {
         const assetId = treeNode.meta.data?.id || treeNode.id
         url = setUrlParam(url, 'node_id', '')
         url = setUrlParam(url, 'asset_id', assetId)
         url = setUrlParam(url, 'show_current_asset', showCurrentAsset)
-      } else if (treeNode.meta.type === 'category') {
+      } else if (nodeType === 'category') {
         url = setUrlParam(url, 'category', treeNode.meta.category)
-      } else if (treeNode.meta.type === 'type') {
+      } else if (nodeType === 'type') {
         url = setUrlParam(url, 'category', treeNode.meta.category)
         url = setUrlParam(url, 'type', treeNode.meta._type)
-      } else if (treeNode.meta.type === 'platform') {
+      } else if (nodeType === 'platform') {
         url = setUrlParam(url, 'platform', treeNode.id)
       }
       url = this.appendTreeUrlQuery(url)

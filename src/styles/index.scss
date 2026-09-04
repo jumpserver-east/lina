@@ -3,54 +3,16 @@
 //@import './transition.scss';
 @use './sidebar';
 @use './menu';
-@use './fonts';
 @use './element-form-controls';
-@import './fonts/font-awesome.min.css';
-
-:root {
-  --scrollbar-size: 8px;
-  --scrollbar-track: transparent;
-  --scrollbar-thumb: rgba(130, 139, 149, 0.45);
-  --scrollbar-thumb-hover: rgba(103, 111, 120, 0.68);
-}
-
-html,
-body,
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
-*::-webkit-scrollbar {
-  width: var(--scrollbar-size);
-  height: var(--scrollbar-size);
-}
-
-*::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-*::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-  border-radius: 999px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: var(--scrollbar-thumb);
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background-color: var(--scrollbar-thumb-hover);
-}
+@use './list-layout';
+@use './compact-loading';
 
 body {
   min-height: 100%;
   height: 100%;
   margin: 0;
   overflow: hidden;
+  background-color: var(--page-background-color, #fff);
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: auto;
   color: var(--color-text-primary);
@@ -70,11 +32,13 @@ label {
 html {
   height: 100%;
   box-sizing: border-box;
+  background-color: var(--page-background-color, #fff);
 }
 
 #app {
   min-height: 100%;
   height: 100%;
+  background-color: var(--page-background-color, #fff);
 }
 
 *,
@@ -112,7 +76,16 @@ div:focus {
 }
 
 .white-bg {
-  background-color: #ffffff;
+  background-color: var(--page-background-color, #fff);
+}
+
+// Dashboard/report blocks opt into this semantic class. Restricting the border
+// to explicit panels avoids double frames around nested charts and summary cards.
+.dashboard-panel {
+  box-sizing: border-box;
+  border: 1px solid var(--panel-border-color, var(--el-border-color));
+  border-radius: var(--el-card-border-radius, 4px);
+  background-color: var(--page-background-color, #fff);
 }
 
 .small,
@@ -337,7 +310,7 @@ input[type='file'] {
 
 // table 相关通用样式
 .el-data-table .el-table {
-  border-radius: 5px 5px 0 0;
+  border-radius: var(--el-card-border-radius, 4px) var(--el-card-border-radius, 4px) 0 0;
   overflow: hidden;
 
   .el-table__inner-wrapper,
@@ -389,6 +362,11 @@ input[type='file'] {
     padding: 6px 0;
   }
 
+  th:not(:first-child):not(:last-child) > .cell,
+  td:not(:first-child):not(:last-child) > .cell {
+    padding-left: 17px;
+  }
+
   .table {
     margin-top: 15px;
   }
@@ -399,7 +377,8 @@ input[type='file'] {
   }
 
   // 表头
-  .el-table__header thead > tr > th {
+  .el-table__header thead > tr > th,
+  .el-table__body-header > tr > th {
     &:first-child {
       border-top-left-radius: 5px;
     }
@@ -472,10 +451,6 @@ input[type='file'] {
         }
       }
     }
-
-    &.selected-row {
-      background-color: #f5f7fa;
-    }
   }
 }
 
@@ -510,7 +485,9 @@ a.el-link.el-link--info.is-hover-underline:hover:after {
 }
 
 .el-dialog__title {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 24px;
 }
 
 .el-drawer.rtl,
@@ -815,13 +792,6 @@ li.rmenu i.fa {
 //  }
 //}
 
-.el-table__row {
-  ::-webkit-scrollbar {
-    width: 6px; /* 设置垂直滚动条的宽度 */
-    height: 6px; /* 设置水平滚动条的高度 */
-  }
-}
-
 .el-drawer.drawer .el-drawer__header,
 .el-drawer__wrapper .el-drawer__header {
   min-height: 56px;
@@ -882,12 +852,12 @@ li.rmenu i.fa {
 
   i,
   .el-icon {
-    color: var(--color-primary);
+    color: inherit;
   }
 
-  &:hover,
-  &:focus,
-  &:active {
+  &:hover:not(.is-disabled),
+  &:focus:not(.is-disabled),
+  &:active:not(.is-disabled) {
     color: #fff;
     background-color: var(--color-primary);
     border-color: var(--color-primary);
