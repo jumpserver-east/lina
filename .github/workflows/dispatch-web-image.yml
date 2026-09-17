@@ -1,12 +1,13 @@
 name: Dispatch Complete Web Image Build
 
 on:
-  create:
-  workflow_run:
-    workflows:
-      - JumpServer repos generic handler
-    types:
-      - completed
+  push:
+    branches-ignore:
+      - main
+      - master
+      - docker-build
+      - dev
+      - v**
   workflow_dispatch:
     inputs:
       branch:
@@ -24,22 +25,22 @@ permissions:
   contents: read
 
 concurrency:
-  group: dispatch-web-${{ inputs.tag || github.event.workflow_run.head_sha || github.sha }}
+  group: dispatch-web-${{ inputs.tag || github.sha }}
   cancel-in-progress: true
 
 jobs:
   dispatch:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'create' && github.event.ref_type == 'branch') ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
+      (github.event_name == 'push' && github.ref_type == 'branch' &&
+       github.ref_name != 'main' && github.ref_name != 'master' &&
+       github.ref_name != 'docker-build' && github.ref_name != 'dev' &&
+       !startsWith(github.ref_name, 'v'))
     uses: jumpserver-east/docker-web/.github/workflows/reusable-web-dispatch.yml@docker-build
     with:
       component: lina
-      source_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_sha || github.event.ref }}
-      source_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.event.workflow_run.head_branch || github.event.ref }}
+      source_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
+      source_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}
       image_tag: ${{ inputs.tag }}
     secrets:
       DOCKER_WEB_DISPATCH_TOKEN: ${{ secrets.DOCKER_WEB_DISPATCH_TOKEN }}

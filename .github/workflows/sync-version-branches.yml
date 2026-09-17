@@ -1,0 +1,122 @@
+name: Sync upstream branches
+
+on:
+  schedule:
+    # Every Monday at 08:17 Asia/Shanghai (00:17 UTC).
+    - cron: '17 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Preview changes without pushing branches
+        type: boolean
+        required: true
+        default: true
+  push:
+    branches: [docker-build]
+    paths:
+      - .github/workflows/sync-version-branches.yml
+      - .github/scripts/sync-version-branches.sh
+      - .github/scripts/test_sync_version_branches.py
+  pull_request:
+    branches: [docker-build]
+    paths:
+      - .github/workflows/sync-version-branches.yml
+      - .github/scripts/sync-version-branches.sh
+      - .github/scripts/test_sync_version_branches.py
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test branch synchronization with local Git repositories
+        run: python3 .github/scripts/test_sync_version_branches.py
+
+  disable-inherited-workflows:
+    needs: test
+    if: >-
+      github.repository == 'jumpserver-east/lina' &&
+      github.ref == 'refs/heads/docker-build' &&
+      (github.event_name == 'push' || github.event_name == 'schedule' ||
+       (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Keep only jumpserver-east workflows enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${GH_REPO}/actions/workflows?per_page=100" \
+            --jq '.workflows[] | [.id, .path, .state] | @tsv' \
+            > "${RUNNER_TEMP}/workflows.tsv"
+          {
+            echo '### Workflow policy'
+            echo
+            echo '| Workflow | State |'
+            echo '| --- | --- |'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          failed=0
+          while IFS=$'\t' read -r workflow_id workflow_path workflow_state; do
+            case "${workflow_path}" in
+              .github/workflows/dispatch-web-image.yml|\
+              .github/workflows/sync-version-branches.yml)
+                echo "| ${workflow_path} | kept |" >> "${GITHUB_STEP_SUMMARY}"
+                continue
+                ;;
+            esac
+            if [[ "${workflow_state}" == deleted ]]; then
+              echo "| ${workflow_path} | deleted |" >> "${GITHUB_STEP_SUMMARY}"
+              continue
+            fi
+            if [[ "${workflow_state}" != disabled_manually ]]; then
+              if ! gh api --method PUT \
+                "repos/${GH_REPO}/actions/workflows/${workflow_id}/disable" --silent; then
+                echo "| ${workflow_path} | FAILED to disable |" >> "${GITHUB_STEP_SUMMARY}"
+                failed=$((failed + 1))
+                continue
+              fi
+            fi
+            workflow_state="$(gh api "repos/${GH_REPO}/actions/workflows/${workflow_id}" --jq '.state')"
+            echo "| ${workflow_path} | ${workflow_state} |" >> "${GITHUB_STEP_SUMMARY}"
+            if [[ "${workflow_state}" != disabled_manually ]]; then
+              failed=$((failed + 1))
+            fi
+          done < "${RUNNER_TEMP}/workflows.tsv"
+          [[ "${failed}" == 0 ]]
+
+  sync:
+    needs: test
+    if: >-
+      github.repository == 'jumpserver-east/lina' &&
+      github.ref == 'refs/heads/docker-build' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    concurrency:
+      group: sync-upstream-version-branches
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docker-build
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_BRANCHES_TOKEN || github.token }}
+      - name: Synchronize version and development branches from upstream to origin
+        env:
+          UPSTREAM_URL: https://github.com/jumpserver/lina.git
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+          SYNC_TOKEN_SOURCE: ${{ secrets.SYNC_BRANCHES_TOKEN && 'SYNC_BRANCHES_TOKEN' || 'GITHUB_TOKEN' }}
+        run: bash .github/scripts/sync-version-branches.sh
