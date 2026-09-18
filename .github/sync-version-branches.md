@@ -7,7 +7,7 @@
 
 ## 同步规则
 
-- 每周一北京时间 08:17 自动执行实际同步，也可手动运行；手动运行默认是 dry-run。
+- 周一至周五北京时间 09:00 自动执行实际同步，也可手动运行；手动运行默认是 dry-run。
 - `dev`、`v3`、`v4`、`v5` 精确镜像 upstream，必要时使用带 lease 的强制更新。
 - `vX.Y.Z`、`vX.Y.Z-lts`、`vX.Y.Z-N-lts` 版本分支只创建或 fast-forward。
 - 不删除 fork 独有分支，不同步 tag，不向 upstream 写入。
@@ -70,3 +70,9 @@ python3 .github/scripts/test_sync_version_branches.py
 python3 .github/scripts/test_workflow_policy.py
 DRY_RUN=true bash .github/scripts/sync-version-branches.sh
 ```
+
+## 构建邮件通知
+
+镜像构建始终通知触发工作流的操作人，重跑时通知重跑操作人。邮件包含结果、分支/提交来源、
+镜像标签和运行链接。Lina/Luna 的通知在统一 Web 构建完成后发送；dispatch 失败单独通知。
+需要配置 SMTP Secrets 和私有邮箱用户映射，详见 [统一邮件配置](https://github.com/jumpserver-east/docker-web/blob/docker-build/.github/build-notifications.md)。

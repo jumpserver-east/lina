@@ -42,5 +42,13 @@ jobs:
       source_ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
       source_branch: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.ref_name }}
       image_tag: ${{ inputs.tag }}
+      actor: ${{ github.triggering_actor || github.actor }}
+      event: ${{ github.event_name }}
     secrets:
       DOCKER_WEB_DISPATCH_TOKEN: ${{ secrets.DOCKER_WEB_DISPATCH_TOKEN }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
+      MAIL_RECIPIENTS_JSON: ${{ secrets.MAIL_RECIPIENTS_JSON }}
