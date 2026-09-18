@@ -46,7 +46,10 @@
 
 从 upstream 继承的 workflow 文件从 `docker-build` 删除。源码分支仍保持与 upstream
 相同的提交，因此其中可能仍包含上游 workflow 文件；同步工作流通过 GitHub API 在
-仓库级停用除上述白名单外的全部 workflow。这个操作只作用于
+仓库级停用除上述白名单外、位于 `.github/workflows/` 的 YAML workflow。
+GitHub 自动管理的 `Dependency Graph`（`dynamic/dependabot/update-graph`）等系统任务
+不属于继承的 YAML 工作流，直接跳过；它们不支持普通 workflow 的停用 API。
+停用或回读失败仍会让任务失败，日志会注明具体 workflow 路径及 ID。这个操作只作用于
 `jumpserver-east/lina`，不会修改 `jumpserver/lina`。
 
 同步创建 `dev`、所有 `v*` 开发/版本分支时不会触发 Web 镜像。创建其他分支或手动运行
@@ -64,5 +67,6 @@ secret `SYNC_BRANCHES_TOKEN`。组织策略要求审批或 SSO 时还需完成�
 
 ```bash
 python3 .github/scripts/test_sync_version_branches.py
+python3 .github/scripts/test_workflow_policy.py
 DRY_RUN=true bash .github/scripts/sync-version-branches.sh
 ```

@@ -17,12 +17,14 @@ on:
       - .github/workflows/sync-version-branches.yml
       - .github/scripts/sync-version-branches.sh
       - .github/scripts/test_sync_version_branches.py
+      - .github/scripts/test_workflow_policy.py
   pull_request:
     branches: [docker-build]
     paths:
       - .github/workflows/sync-version-branches.yml
       - .github/scripts/sync-version-branches.sh
       - .github/scripts/test_sync_version_branches.py
+      - .github/scripts/test_workflow_policy.py
 
 permissions:
   contents: read
@@ -36,7 +38,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Test branch synchronization with local Git repositories
-        run: python3 .github/scripts/test_sync_version_branches.py
+        run: |
+          python3 .github/scripts/test_sync_version_branches.py
+          python3 .github/scripts/test_workflow_policy.py
 
   disable-inherited-workflows:
     needs: test
@@ -74,20 +78,37 @@ jobs:
                 echo "| ${workflow_path} | kept |" >> "${GITHUB_STEP_SUMMARY}"
                 continue
                 ;;
+              .github/workflows/*.yml|.github/workflows/*.yaml)
+                ;;
+              *)
+                # GitHub-managed workflows (for example Dependency Graph) are
+                # not inherited YAML workflows and cannot use the disable API.
+                echo "Skipping managed workflow: ${workflow_path} (${workflow_state})"
+                echo "| ${workflow_path} | managed by GitHub; skipped |" >> "${GITHUB_STEP_SUMMARY}"
+                continue
+                ;;
             esac
             if [[ "${workflow_state}" == deleted ]]; then
               echo "| ${workflow_path} | deleted |" >> "${GITHUB_STEP_SUMMARY}"
               continue
             fi
             if [[ "${workflow_state}" != disabled_manually ]]; then
+              echo "Disabling inherited workflow: ${workflow_path} (id=${workflow_id}, state=${workflow_state})"
               if ! gh api --method PUT \
                 "repos/${GH_REPO}/actions/workflows/${workflow_id}/disable" --silent; then
+                echo "::error::Failed to disable inherited workflow: ${workflow_path} (id=${workflow_id})"
                 echo "| ${workflow_path} | FAILED to disable |" >> "${GITHUB_STEP_SUMMARY}"
                 failed=$((failed + 1))
                 continue
               fi
             fi
-            workflow_state="$(gh api "repos/${GH_REPO}/actions/workflows/${workflow_id}" --jq '.state')"
+            if ! workflow_state="$(gh api "repos/${GH_REPO}/actions/workflows/${workflow_id}" --jq '.state')"; then
+              echo "::error::Failed to verify inherited workflow: ${workflow_path} (id=${workflow_id})"
+              echo "| ${workflow_path} | FAILED to verify |" >> "${GITHUB_STEP_SUMMARY}"
+              failed=$((failed + 1))
+              continue
+            fi
+            echo "${workflow_path}: ${workflow_state}"
             echo "| ${workflow_path} | ${workflow_state} |" >> "${GITHUB_STEP_SUMMARY}"
             if [[ "${workflow_state}" != disabled_manually ]]; then
               failed=$((failed + 1))
