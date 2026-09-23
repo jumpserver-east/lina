@@ -1618,6 +1618,15 @@
     "type": "類型",
     "user": "用戶",
     "is_locked": "是否暫停",
+    "faceVerify": "人臉核對",
+    "faceVerifySuccess": "通過",
+    "faceVerifyFail": "失敗",
+    "faceVerifyFailedCount": "失敗次數",
+    "faceVerifyTokenFailed": "調用拍照系統失敗",
+    "faceVerifyCameraCallFailed": "調用拍照系統失敗",
+    "faceVerifyTimeout": "等待拍照系統回調超時",
+    "faceVerifyCompareRejected": "人臉比對不通過",
+    "faceVerifyCompareError": "人臉比對不通過",
     "riskLevels": {
       "common": "普通"
     },

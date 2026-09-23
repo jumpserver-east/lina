@@ -1636,6 +1636,15 @@
     "type": "タイプ",
     "user": "ユーザー",
     "is_locked": "一時停止するかどうか",
+    "faceVerify": "顔認証",
+    "faceVerifySuccess": "通過",
+    "faceVerifyFail": "失敗",
+    "faceVerifyFailedCount": "失敗回数",
+    "faceVerifyTokenFailed": "撮影システムの呼び出しに失敗",
+    "faceVerifyCameraCallFailed": "撮影システムの呼び出しに失敗",
+    "faceVerifyTimeout": "撮影システムのコールバック待機がタイムアウト",
+    "faceVerifyCompareRejected": "顔照合不一致",
+    "faceVerifyCompareError": "顔照合不一致",
     "riskLevels": {
       "common": "普通"
     },

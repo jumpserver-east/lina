@@ -1642,6 +1642,15 @@
     "type": "Type",
     "user": "Use",
     "is_locked": "Is Locked",
+    "faceVerify": "Face verification",
+    "faceVerifySuccess": "Passed",
+    "faceVerifyFail": "Failed",
+    "faceVerifyFailedCount": "Failed count",
+    "faceVerifyTokenFailed": "Failed to call camera system",
+    "faceVerifyCameraCallFailed": "Failed to call camera system",
+    "faceVerifyTimeout": "Camera callback timed out",
+    "faceVerifyCompareRejected": "Face compare rejected",
+    "faceVerifyCompareError": "Face compare rejected",
     "riskLevels": {
       "common": "common"
     },

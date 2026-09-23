@@ -53,7 +53,7 @@ export default {
         },
         columns: [
           'expandCol', 'input', 'risk_level', 'user', 'remote_addr',
-          'asset', 'account', 'session', 'timestamp'
+          'asset', 'account', 'session', 'face_verify', 'timestamp'
         ],
         extraQuery: {
           date_to: dateTo,
@@ -105,6 +105,11 @@ export default {
                 }
               }
             }
+          },
+          face_verify: {
+            label: this.$t('sessions.faceVerify'),
+            width: '100px',
+            formatter: this.formatFaceVerify
           },
           timestamp: {
             label: this.$t('sessions.date'),
@@ -232,6 +237,46 @@ export default {
         }, {})
       query = deepmerge(this.query, query)
       return query
+    },
+    formatFaceVerify(row) {
+      const faceVerify = row.face_verify
+      if (!faceVerify) {
+        return <span>-</span>
+      }
+
+      const isSuccess = faceVerify.is_success === undefined
+        ? faceVerify.status === 'passed'
+        : faceVerify.is_success
+      const successLabel = isSuccess
+        ? this.$t('sessions.faceVerifySuccess')
+        : this.$t('sessions.faceVerifyFail')
+      const tagType = isSuccess ? 'success' : 'danger'
+      const message = this.getFaceVerifyMessage(faceVerify, isSuccess)
+      const tag = <el-tag type={tagType} size='mini'>{successLabel}</el-tag>
+      if (!message) {
+        return tag
+      }
+      return (
+        <el-tooltip content={message} placement='top' effect='dark'>
+          {tag}
+        </el-tooltip>
+      )
+    },
+    getFaceVerifyMessage(faceVerify, isSuccess) {
+      if (isSuccess) {
+        return ''
+      }
+      if (faceVerify.message) {
+        return faceVerify.message
+      }
+      const messageMapper = {
+        token_failed: this.$t('sessions.faceVerifyTokenFailed'),
+        camera_call_failed: this.$t('sessions.faceVerifyCameraCallFailed'),
+        timeout: this.$t('sessions.faceVerifyTimeout'),
+        failed: this.$t('sessions.faceVerifyCompareRejected'),
+        error: this.$t('sessions.faceVerifyCompareError')
+      }
+      return messageMapper[faceVerify.status] || this.$t('sessions.faceVerifyCompareError')
     }
   }
 }
