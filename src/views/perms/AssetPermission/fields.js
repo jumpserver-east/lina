@@ -57,7 +57,10 @@ function getFields() {
 
   const accounts = {
     type: 'input',
-    component: AccountFormatter
+    component: AccountFormatter,
+    el: {
+      showAccountSelect: true
+    }
   }
 
   const date_start = {

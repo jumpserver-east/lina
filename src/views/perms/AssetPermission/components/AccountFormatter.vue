@@ -18,6 +18,15 @@
           :tag-type="getTagType"
           @change="handleSpecAccountsChange"
         />
+        <AccountUsernameSelect
+          v-if="showAccountSelect"
+          :assets="assets"
+          :nodes="nodes"
+          :oid="oid"
+          :value="specAccountsInput"
+          class="spec-account-select"
+          @confirm="handleSpecAccountsSelect"
+        />
         <span v-if="showAddTemplate">
           <el-button size="small" type="primary" @click="showTemplateDialog = true">
             {{ $t('TemplateAdd') }}
@@ -67,6 +76,7 @@
 </template>
 
 <script>
+import AccountUsernameSelect from '@/components/Form/FormFields/AccountUsernameSelect.vue'
 import { TagInput } from '@/components/Form/FormFields'
 import {
   accountTemplateTable,
@@ -106,6 +116,7 @@ function normalizeResourceIds(values, objectKeys = ['id', 'pk', 'value']) {
 
 export default {
   components: {
+    AccountUsernameSelect,
     TagInput,
     ListTable,
     Dialog
@@ -135,6 +146,10 @@ export default {
     showAddTemplate: {
       type: Boolean,
       default: true
+    },
+    showAccountSelect: {
+      type: Boolean,
+      default: false
     },
     enableVirtualAccount: {
       type: Boolean,
@@ -322,6 +337,10 @@ export default {
     handleRadioChanged(value) {
       this.outputValue()
     },
+    handleSpecAccountsSelect(usernames) {
+      this.specAccountsInput = this.normalizeAccountValue(usernames)
+      this.outputValue()
+    },
     handleSpecAccountsChange(value) {
       this.specAccountsInput = this.normalizeAccountValue(value)
       this.outputValue()
@@ -379,6 +398,10 @@ export default {
     width: 100%;
     margin-bottom: 3px !important;
   }
+}
+
+.spec-account-select {
+  margin-right: 10px;
 }
 
 .help-text {

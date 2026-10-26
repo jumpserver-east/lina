@@ -145,6 +145,7 @@ export default {
           el: {
             enableExcludeAccounts: true,
             enableNoneAccount: true,
+            showAccountSelect: true,
             assets: [],
             nodes: []
           },

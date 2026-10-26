@@ -19,6 +19,7 @@
           :nodes="nodeIds"
           :value="object['accounts']"
           class="checkbox-accounts"
+          show-account-select
           @change="updateAccount"
         />
       </IBox>
