@@ -7,6 +7,7 @@ import { AutomationParams } from '@/components'
 import { ResourceSelect, TreeResourceSelect } from '@/components/Form/FormFields'
 import { GenericCreateUpdatePage } from '@/layout/components'
 import { getChangeSecretFields } from '@/views/accounts/AccountChangeSecret/fields'
+import AccountUsernameInput from './components/AccountUsernameInput.vue'
 
 export default {
   name: 'AccountChangeSecretCreateUpdate',
@@ -51,6 +52,19 @@ export default {
       ],
       fieldsMeta: {
         ...getChangeSecretFields(),
+        accounts: {
+          label: this.$t('Accounts'),
+          component: AccountUsernameInput,
+          helpText: this.$t('ChangeSecretAccountHelpText'),
+          el: {
+            assets: [],
+            nodes: [],
+            secretType: ''
+          },
+          hidden: (formValue) => {
+            this.fieldsMeta.accounts.el.secretType = formValue.secret_type || ''
+          }
+        },
         assets: {
           type: 'resourceSelect',
           component: ResourceSelect,
@@ -127,12 +141,14 @@ export default {
     node_ids: {
       handler(val) {
         this.fieldsMeta.params.el.nodes = val
+        this.fieldsMeta.accounts.el.nodes = val
       },
       deep: true
     },
     asset_ids: {
       handler(val) {
         this.fieldsMeta.params.el.assets = val
+        this.fieldsMeta.accounts.el.assets = val
       },
       deep: true
     }

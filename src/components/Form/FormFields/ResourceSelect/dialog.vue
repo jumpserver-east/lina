@@ -156,6 +156,10 @@ export default {
     pageSize: {
       type: Number,
       default: 10
+    },
+    labelSearch: {
+      type: Boolean,
+      default: true
     }
   },
   emits: ['cancel', 'confirm', 'update:visible'],
@@ -217,7 +221,7 @@ export default {
         hasImport: false,
         hasExport: false,
         hasRefresh: false,
-        hasLabelSearch: true,
+        hasLabelSearch: this.labelSearch,
         labelSearchConfig: {
           boundarySelector: '.resource-select-dialog.el-dialog'
         },
