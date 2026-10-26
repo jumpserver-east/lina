@@ -142,5 +142,14 @@
   "RemoveAccountParams": "账号移除参数",
   "NoUnreadMsg": "暂无未读消息",
   "LoadFailed": "加载失败",
-  "Retry": "重试"
+  "Retry": "重试",
+  "MFAFollowSystem": "跟随系统",
+  "MFAFollowSystemHelp": "自动跟随系统策略，包括以后启用的方式。",
+  "MFACurrentAvailable": "当前可用方式",
+  "MFAFeatureDisabled": "功能未开启",
+  "MFASystemDisallowed": "系统策略不允许",
+  "MFASystemPolicyHelp": "可提前配置尚未开启的方式，仅在对应功能开启后生效。",
+  "MFAStoredInactiveHelp": "已保留当前不生效的选择，满足条件后自动生效。",
+  "MFANoEffectiveMethod": "当前没有可生效的 MFA 方式，强制启用 MFA 前请检查策略和功能配置。",
+  "MFACapabilitiesUnavailable": "无法获取 MFA 功能状态，请刷新后再编辑。"
 }

@@ -5,6 +5,7 @@
 </template>
 
 <script>
+import MFAMethodSelect from '@/components/Form/FormFields/MFAMethodSelect.vue'
 import IBox from '@/components/Common/IBox/index.vue'
 import rules from '@/components/Form/DataForm/rules'
 import GenericCreateUpdateForm from '@/layout/components/GenericCreateUpdateForm/index.vue'
@@ -30,6 +31,7 @@ export default {
             'MFA',
             [
               'SECURITY_MFA_AUTH',
+              'SECURITY_MFA_METHODS',
               'SECURITY_MFA_IN_LOGIN_PAGE',
               'SECURITY_MFA_BY_EMAIL',
               'SECURITY_MFA_AUTH_ENABLED_FOR_THIRD_PARTY',
@@ -40,6 +42,12 @@ export default {
           ]
         ],
         fieldsMeta: {
+          SECURITY_MFA_METHODS: {
+            component: MFAMethodSelect,
+            type: 'mfa-method-select',
+            helpText: '',
+            el: { system: true }
+          },
           SECURITY_LOGIN_CHALLENGE_ENABLED: {
             on: {
               change: ([val], updateForm) => {
